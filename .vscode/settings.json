@@ -1,0 +1,91 @@
+{
+  // ============================================================
+  // TRACKING-MICROCONTROLADOR: Arduino / ESP32 (C/C++)
+  // ============================================================
+
+  // Asociar archivos .ino a C++
+  "files.associations": {
+    "*.ino": "cpp",
+    "*.h": "cpp",
+    "*.cpp": "cpp"
+  },
+
+  // C/C++ IntelliSense
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+
+  // Desactivar linting innecesario para Arduino
+  "C_Cpp.errorSquiggles": "enabled",
+  "C_Cpp.intelliSenseEngine": "default",
+
+  // Arduino
+  "arduino.useArduinoCli": true,
+
+  // Ocultar del explorador
+  "files.exclude": {
+    ".pio": true,
+    ".pioenvs": true,
+    ".piolibdeps": true,
+    "build": true
+  },
+
+  // cSpell - palabras específicas de Arduino/Embedded
+  "cSpell.words": [
+    "arduino",
+    "esp32",
+    "esp8266",
+    "gpio",
+    "uart",
+    "mqtt",
+    "wifi",
+    "ssid",
+    "bluetooth",
+    "baud",
+    "ublox",
+    "lora",
+    "gps",
+    "nmea",
+    "gprs",
+    "gsm",
+    "pinMode",
+    "digitalWrite",
+    "digitalRead",
+    "analogRead",
+    "analogWrite",
+    "millis",
+    "micros",
+    "println",
+    "sprintf",
+    "strcmp",
+    "strlen",
+    "strcpy",
+    "memcpy",
+    "memset",
+    "atoi",
+    "atof",
+    "dtostrf",
+    "eeprom",
+    "spi",
+    "neopixel",
+    "adafruit",
+    "tinygps",
+    "pubsubclient",
+    "softwareserial",
+    "hardwareserial",
+    "serialport",
+    "wifimanager",
+    "webserver",
+    "httpclient",
+    "spiffs",
+    "littlefs",
+    "typedef",
+    "struct",
+    "uint8",
+    "uint16",
+    "uint32",
+    "int8",
+    "int16",
+    "int32"
+  ]
+}

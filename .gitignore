@@ -1,0 +1,17 @@
+# Build output
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Arduino IDE
+build/
+*.elf
+*.hex
+*.bin
+
+# VS Code
+.vscode/c_cpp_properties.json
+
+# OS
+.DS_Store
+Thumbs.db
