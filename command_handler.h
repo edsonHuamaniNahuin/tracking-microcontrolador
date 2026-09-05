@@ -4,7 +4,7 @@
  * ============================================================
  * Patrón: Command
  * Interpreta y ejecuta comandos recibidos del API.
- * Soporta: reboot, update_config, reset_wifi
+ * Soporta: reboot, update_config, open_config_server
  */
 
 #ifndef COMMAND_HANDLER_H
@@ -59,9 +59,9 @@ public:
       return _executeUpdateConfig();
     }
 
-    if (response.command == "reset_wifi")
+    if (response.command == "open_config_server")
     {
-      return _executeResetWifi();
+      return _executeOpenConfigServer();
     }
 
     Serial.printf("[CMD] Comando desconocido: %s\n", response.command.c_str());
@@ -76,9 +76,18 @@ public:
     return changed;
   }
 
+  /** ¿Se solicitó abrir el servidor de configuración? */
+  bool configServerRequested()
+  {
+    bool requested = _configServerRequested;
+    _configServerRequested = false;
+    return requested;
+  }
+
 private:
   LedIndicator &_led;
   bool _configChanged = false;
+  bool _configServerRequested = false;
 
   bool _executeReboot()
   {
@@ -97,14 +106,11 @@ private:
     return false;
   }
 
-  bool _executeResetWifi()
+  bool _executeOpenConfigServer()
   {
-    Serial.println("[CMD] Reset WiFi — reabriendo portal cautivo...");
-    _led.setState(DeviceState::RESETTING);
-    _led.update();
-    delay(500);
-    // Se manejará en el loop principal
-    return true;
+    Serial.println("[CMD] Abriendo servidor de configuracion web...");
+    _configServerRequested = true;
+    return false;
   }
 };
 

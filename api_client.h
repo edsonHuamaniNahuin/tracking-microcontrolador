@@ -11,7 +11,7 @@
 #define API_CLIENT_H
 
 #include <Arduino.h>
-#include <WiFi.h>
+#include <ETH.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "config.h"
@@ -49,9 +49,9 @@ public:
       return resp;
     }
 
-    if (WiFi.status() != WL_CONNECTED)
+    if (!ETH.linkUp())
     {
-      resp.errorMessage = "WiFi desconectado";
+      resp.errorMessage = "Ethernet desconectado";
       return resp;
     }
 
@@ -70,9 +70,17 @@ public:
       doc["speed"] = serialized(String(gps.speed / 1.852, 2)); // km/h → knots
       doc["course"] = serialized(String(gps.course, 2));
       doc["altitude"] = serialized(String(gps.altitude, 2));
-      doc["satellites"] = gps.satellites;
+    }
+    // Estado del GPS siempre (diagnóstico remoto, aunque no haya señal)
+    doc["satellites"] = gps.satellites;
+    if (gps.satellites > 0)
+    {
       doc["hdop"] = serialized(String(gps.hdop, 2));
     }
+    doc["gps_chars"] = gps.chars;   // bytes NMEA recibidos (0 = GPS no habla)
+    doc["gps_fix"] = gps.isValid;
+    doc["gps_passed"] = gps.passedChecksums; // sentencias NMEA válidas
+    doc["gps_failed"] = gps.failedChecksums; // sentencias corruptas
     doc["firmware"] = FIRMWARE_VERSION;
     doc["device_type"] = DEVICE_TYPE;
     doc["uptime"] = millis() / 1000;

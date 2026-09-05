@@ -15,15 +15,15 @@
 
 enum class DeviceState
 {
-  BOOTING,         // LED encendido fijo
-  CONNECTING_WIFI, // Parpadeo rápido
-  WAITING_GPS,     // Parpadeo lento
-  RUNNING,         // LED encendido fijo
-  ERROR_WIFI,      // 2 parpadeos rápidos + pausa
-  ERROR_API,       // 3 parpadeos rápidos + pausa
-  ERROR_NO_TOKEN,  // 5 parpadeos rápidos + pausa
-  PORTAL_ACTIVE,   // Parpadeo medio
-  RESETTING        // Parpadeo muy rápido
+  BOOTING,            // LED encendido fijo
+  CONNECTING_NETWORK, // Parpadeo rápido (Ethernet DHCP)
+  WAITING_GPS,        // Parpadeo lento
+  RUNNING,            // LED encendido fijo
+  ERROR_NETWORK,      // 2 parpadeos rápidos + pausa
+  ERROR_API,          // 3 parpadeos rápidos + pausa
+  ERROR_NO_TOKEN,     // 5 parpadeos rápidos + pausa
+  CONFIG_SERVER,      // Parpadeo medio (servidor web activo)
+  RESETTING           // Parpadeo muy rápido
 };
 
 class LedIndicator
@@ -52,7 +52,7 @@ public:
       digitalWrite(LED_STATUS_PIN, HIGH);
       break;
 
-    case DeviceState::CONNECTING_WIFI:
+    case DeviceState::CONNECTING_NETWORK:
     case DeviceState::RESETTING:
       _blink(now, LED_BLINK_FAST);
       break;
@@ -61,11 +61,11 @@ public:
       _blink(now, LED_BLINK_SLOW);
       break;
 
-    case DeviceState::PORTAL_ACTIVE:
+    case DeviceState::CONFIG_SERVER:
       _blink(now, 500);
       break;
 
-    case DeviceState::ERROR_WIFI:
+    case DeviceState::ERROR_NETWORK:
       _blinkPattern(now, 2);
       break;
 

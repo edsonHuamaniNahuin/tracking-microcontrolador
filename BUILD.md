@@ -13,7 +13,7 @@ Guía para alguien que **nunca ha trabajado con microcontroladores**. Explica qu
 5. [Qué pedir que suelden en la tienda](#5-qué-pedir-que-suelden-en-la-tienda)
 6. [Ensamblaje paso a paso](#6-ensamblaje-paso-a-paso)
 7. [Verificar que funciona](#7-verificar-que-funciona)
-8. [Configurar el dispositivo (portal cautivo)](#8-configurar-el-dispositivo-portal-cautivo)
+8. [Configurar el dispositivo](#8-configurar-el-dispositivo)
 9. [Montaje en el barco](#9-montaje-en-el-barco)
 10. [Preguntas frecuentes](#10-preguntas-frecuentes)
 
@@ -24,34 +24,33 @@ Guía para alguien que **nunca ha trabajado con microcontroladores**. Explica qu
 Un **rastreador GPS** que se instala en un barco. El dispositivo:
 
 - Lee la ubicación del barco con un módulo GPS (como el GPS de tu celular, pero independiente)
-- Se conecta a una red WiFi
+- Se conecta a la red por **cable Ethernet** (UTP), no por WiFi
 - Envía las coordenadas al servidor cada pocos segundos
-- Se gestiona remotamente desde la aplicación web
+- Se gestiona remotamente desde la aplicación web (**https://nautic.run**)
 
-El dispositivo completo tiene **solo 2 piezas electrónicas** conectadas entre sí con 4 cables:
+El dispositivo completo tiene **solo 2 piezas electrónicas** conectadas entre sí con 4 cables soldados. La conexión a internet es por cable de red (el mismo que usa una computadora de escritorio):
 
 ```
 ┌────────────────────┐         ┌────────────────────┐
 │                    │  4      │                    │
-│   ESP32 DevKit     │ cables  │   Módulo GPS       │
+│   WT32-ETH01       │ cables  │   Módulo GPS       │
 │   (el cerebro)     │────────→│   (el localizador)  │
 │                    │         │                    │
 │  Ya incluye:       │         │  Ya incluye:       │
-│  • WiFi            │         │  • Antena cerámica │
+│  • Ethernet RJ45   │         │  • Antena cerámica │
 │  • LED indicador   │         │                    │
-│  • Botón reset     │         │                    │
-│  • Puerto USB      │         │                    │
+│  • Conector PoE    │         │                    │
 └────────────────────┘         └────────────────────┘
         │
-    Cable USB
+    Cable Ethernet
+    (datos + energía por PoE)
         │
    ┌─────────┐
-   │ Fuente  │  (cargador de celular, powerbank, o
-   │  5V USB │   encendedor del barco con adaptador)
+   │ Router  │  (Starlink, router 4G LTE, switch del barco)
    └─────────┘
 ```
 
-> **No necesitas comprar LED, botones ni pantallas extra.** El ESP32 DevKit ya trae un LED azul integrado en la placa y un botón marcado "BOOT" que usamos para resetear la configuración. Todo viene incluido.
+> **No necesitas WiFi en el barco.** El WT32-ETH01 se conecta con cable de red físico. Es más confiable en ambientes marítimos que el WiFi. La alimentación se hace por el mismo cable Ethernet usando PoE (Power over Ethernet).
 
 ---
 
@@ -61,92 +60,117 @@ El dispositivo completo tiene **solo 2 piezas electrónicas** conectadas entre s
 
 | # | Componente | Cantidad | Precio aprox. | Dónde buscar |
 |---|-----------|----------|---------------|--------------|
-| 1 | **ESP32 DevKit V1** (30 pines, con pines soldados, **USB-C**) | 1 | $3–6 USD | Amazon, AliExpress, MercadoLibre. Buscar: "ESP32 DevKit V1 USB-C" |
-| 2 | **Módulo GPS NEO-6M** (GPS6MV2 / HW-248) | 1 | $3–6 USD | Amazon, AliExpress, MercadoLibre. Buscar: "GPS NEO-6M Arduino" |
-| 3 | **4 cables cortos** (para que suelden en la tienda) | 4 | $0.50 USD | Cualquier cable fino de cobre. La tienda de electrónica lo tiene. |
-| 4 | **Cable USB-C** (para alimentar) | 1 | $1–3 USD | Cable USB-C a USB-A. Si tu fuente de poder tiene USB-C, entonces USB-C a USB-C. |
-| 5 | **Servicio de soldadura** (en la tienda) | 1 | $1–3 USD | Pedir en la misma tienda de electrónica que te suelden las 4 conexiones (ver sección 5) |
+| 1 | **WT32-ETH01 V1.4** | 1 | $8–12 USD | Amazon, AliExpress. Buscar: "WT32-ETH01" |
+| 2 | **Módulo GPS NEO-7M** (o NEO-6M) | 1 | $3–6 USD | Amazon, AliExpress. Buscar: "GPS NEO-7M Arduino" |
+| 3 | **FT232RL YP-05 USB-C** | 1 | $3–5 USD | AliExpress, MercadoLibre. Solo para programar. Buscar: "FT232RL USB-C" |
+| 4 | **Cable Ethernet UTP Cat5e/Cat6** | 1 | $3–8 USD | Cable de red estándar. Largo según distancia al router. |
+| 5 | **Inyector PoE 48V** | 1 | $8–15 USD | Buscar: "PoE injector 48V" |
+| 6 | **Splitter PoE 48V→5V 2A** | 1 | $5–10 USD | Buscar: "PoE splitter 5V 2A" |
+| 7 | **Servicio de soldadura** | 1 | $1–3 USD | Pedir en tienda de electrónica que suelden GPS al WT32-ETH01 |
 
-**Total por barco: ~$9–19 USD**
-
-> **¿Por qué soldar y no usar cables sueltos (dupont)?** En un barco hay vibración, humedad y movimiento constante. Los cables enchufados (dupont) se sueltan fácilmente. Una soldadura es **permanente, confiable y no se desconecta** con el oleaje. Es la diferencia entre un prototipo de escritorio y un dispositivo de producción real.
+**Total por barco: ~$31–59 USD**
 
 ### Para alimentar en el barco (elegir uno)
 
-El ESP32 se alimenta por su **puerto USB-C** con cualquier fuente de 5V. Solo necesitas enchufar un cable USB-C.
-
 | Opción | Precio | Cuándo usarla |
 |--------|--------|---------------|
-| **Cargador USB de celular** (5V, 1A mínimo) | $2–5 USD | Si el barco tiene toma de corriente 110V/220V |
-| **Puerto USB del Starlink** o de cualquier router | $0 USD | Si el router/Starlink tiene un puerto USB de sobra |
-| **Powerbank / batería portátil** (10.000 mAh) | $10–15 USD | Si no hay electricidad. Dura ~2–3 días. |
-| **Adaptador encendedor 12V → USB** | $3–5 USD | Si el barco tiene encendedor/cigarrera 12V |
+| **PoE (inyector + splitter)** | $13–25 USD | Recomendado. Datos y energía por el mismo cable Ethernet. |
+| **Cargador USB 5V** + cable USB-C (para FT232RL) | $2–5 USD | Solo para desarrollo/pruebas. No usar en producción. |
+
+> En producción **siempre usar PoE**: un solo cable Ethernet lleva datos y electricidad. El splitter PoE convierte los 48V que vienen por el cable de red a 5V limpios para el WT32-ETH01.
 
 ### Para proteger del agua (recomendado)
 
 | Componente | Precio | Notas |
 |-----------|--------|-------|
-| **Caja estanca IP65** (~10×7×4 cm) | $3–8 USD | Buscar: "caja estanca electrónica IP65". Debe caber el ESP32 + GPS dentro |
-| **Prensaestopas PG7** (para pasar el cable USB) | $0.50 USD | Opcional. Buscar: "prensaestopa PG7" |
+| **Caja estanca IP65** (~10×7×4 cm) | $3–8 USD | Buscar: "caja estanca electrónica IP65" |
+| **Prensaestopas PG9** (para cable Ethernet) | $0.50 USD | Opcional. Buscar: "prensaestopa PG9" |
 
 ---
 
 ## 3. ¿Cómo se ve cada componente?
 
-### ESP32 DevKit V1
+### WT32-ETH01 V1.4
 
 ```
-    ┌─────────────────────────────────┐
-    │  ┌───┐                          │
-    │  │USB│  ← Puerto USB-C           │
-    │  └───┘    (aquí va el cable)     │
-    │                                 │
-    │  [BOOT] [EN]  ← Dos botones     │
-    │                  pequeños        │
-    │  ● ● ● ● ● ● ● ● ● ● ● ● ● ●  │ ← Pines (agujas metálicas)
-    │  ● ● ● ● ● ● ● ● ● ● ● ● ● ●  │    a cada lado de la placa
-    │                                 │
-    │         (°) ← LED azul          │
-    │             integrado           │
-    └─────────────────────────────────┘
-         Tamaño real: ~5 cm × 2.5 cm
+    ┌──────────────────────────────┐
+    │  ┌───┐                       │
+    │  │RJ45│ ← Puerto Ethernet     │
+    │  └───┘   (aquí va el cable   │
+    │           de red)             │
+    │                              │
+    │  ● ● ● ● ● ● ● ● ●          │ ← Pines lado izquierdo
+    │  ● ● ● ● ● ● ● ● ●          │ ← Pines lado derecho
+    │                              │
+    │       (°) ← LED azul         │
+    │           integrado          │
+    └──────────────────────────────┘
+        Tamaño real: ~5.5 cm × 2.5 cm
 ```
 
-**¿Cómo identificarlo en la tienda?**
-- Placa color negro o azul oscuro
-- Tiene 2 filas de pines metálicos (15 a cada lado)
-- Puerto USB-C en un extremo
-- Tiene impreso "ESP32" o "ESP-WROOM-32"
-- Dos botones pequeños marcados "BOOT" y "EN"
+**¿Cómo identificarlo?**
+- Placa pequeña color negro
+- Tiene un conector RJ45 (puerto de red) en un extremo
+- Dos filas de pines (no todos se usan)
+- Tiene impreso "WT32-ETH01" en la placa
 
-> **IMPORTANTE:** Pedir específicamente el modelo con **USB-C** (no Micro-USB). Asegúrate de que tenga los **pines ya soldados** (las agujas metálicas ya puestas). Si los pines no vienen soldados, necesitarás un soldador o pide la versión "con pines soldados" ("pre-soldered headers").
+> El WT32-ETH01 **no tiene botón BOOT** ni puerto USB. Se programa con el adaptador FT232RL (ver sección 6).
 
-### Módulo GPS (GPS6MV2 / NEO-6M)
+### FT232RL YP-05 (Programador USB-TTL)
+
+```
+    ┌──────────────────────┐
+    │    ┌────┐            │
+    │    │USB-C│ ← Conector │
+    │    └────┘   USB-C    │
+    │                      │
+    │  DTR RX TX VCC CTS GND│ ← Pines (de izquierda a derecha)
+    │                      │
+    │  Jumper: [3V3|5V]    │ ← Debe estar en 5V
+    └──────────────────────┘
+```
+
+> **Pines del YP-05 (izquierda → derecha):** DTR, RX, TX, VCC, CTS, GND. Solo se usan 4: RX (blanco) → TX0 del ESP32, TX (morado) → RX0 del ESP32, VCC (plomo) → 5V, GND (verde) → GND. **DTR (negro) y CTS (azul) no se conectan a nada.**
+
+> **Importante:** Este dispositivo se usa **solo una vez** (para cargar el programa). Se desconecta después y no va en el barco.
+
+### Módulo GPS (NEO-7M / NEO-6M)
 
 ```
     ┌─────────────────────────┐
     │  ┌───────────────────┐  │
     │  │  Antena cerámica  │  │ ← Cuadrado plano, color
-    │  │   (cuadrado)      │  │   blanco/marrón en la parte
-    │  └───────────────────┘  │   superior. Mira al cielo.
+    │  │   (cuadrado)      │  │   metálico. La cara de METAL
+    │  │                   │  │   debe mirar al cielo.
+    │  └───────────────────┘  │
     │                         │
-    │   [chip NEO-6M]         │
+    │   [chip GPS]            │
     │                         │
     │  ● ● ● ●               │ ← 4 pines: VCC GND TX RX
     └─────────────────────────┘
         Tamaño real: ~3.5 cm × 2.5 cm
 ```
 
-**¿Cómo identificarlo en la tienda?**
+**¿Cómo identificarlo?**
 - Placa pequeña azul o verde
-- Tiene una antena cuadrada (cerámica, ~2.5 cm) encima
+- Antena cuadrada cerámica (~2.5 cm) encima
 - Solo 4 pines en un borde: **VCC**, **GND**, **TX**, **RX**
-- Puede decir "GY-GPS6MV2" o "HW-248" o "NEO-6M"
-- A veces la antena viene conectada con un cable (antena activa), a veces está soldada directamente
 
-### Cables (los lleva la tienda)
+### Inyector PoE + Splitter PoE
 
-No necesitas comprar cables por separado. La tienda de electrónica tiene cable de cobre fino para soldar. Es lo que usarán para conectar el ESP32 al GPS. Pide que usen cables cortos (~5-8 cm) para que quede compacto.
+```
+   ┌──────────┐         ┌──────────┐
+   │ INYECTOR │         │ SPLITTER │
+   │   PoE    │         │   PoE    │
+   │          │         │          │
+   │ LAN IN ──┤   UTP   ├── POE IN │
+   │ POE OUT──┤────────→│          │
+   │  ~220V   │         │ 5V OUT ──┤→ WT32-ETH01
+   └──────────┘         └──────────┘
+```
+
+- **Inyector** (va al enchufe 220V y al router): mete la energía al cable de red
+- **Splitter** (va junto al WT32): saca la energía del cable y la baja a 5V
 
 ---
 
@@ -154,458 +178,389 @@ No necesitas comprar cables por separado. La tienda de electrónica tiene cable 
 
 | Herramienta | ¿La necesitas? | Para qué |
 |-------------|----------------|----------|
-| **Computador** con USB | **Sí** (solo una vez) | Para cargar el programa en el ESP32 |
-| **Celular** con WiFi | **Sí** (cada barco) | Para configurar WiFi, token y **dominio del servidor** desde el portal |
+| **Computador** con USB | **Sí** (solo una vez) | Para cargar el programa con el FT232RL |
+| **Laptop con navegador** | **Sí** (cada instalación) | Para configurar el dispositivo en `tracking.local` |
 | Destornillador pequeño | Opcional | Si usas caja estanca con tornillos |
 | Bridas plásticas (amarras) | Opcional | Para fijar en el barco |
 
-> **NO necesitas:** soldador propio (lo hace la tienda), multímetro, protoboard, resistencias, ni pantalla. Solo compras las 2 piezas, pides que las suelden, y está listo.
+> **NO necesitas:** soldador propio (lo hace la tienda), conocimientos de redes, ni WiFi. La configuración es visual desde el navegador.
 
 ---
 
 ## 5. Qué pedir que suelden en la tienda
 
-Este es el paso más importante. Vas a la tienda de electrónica con el ESP32 y el GPS, y le pides al técnico que **suelde 4 cables directamente** entre las dos placas.
+Llevas el WT32-ETH01 y el GPS a la tienda de electrónica. Le pides al técnico que **suelde 4 cables directamente** entre las dos placas.
 
-### Lo que le dices al técnico de la tienda
+### Lo que le dices al técnico
 
-> "Necesito que me suelde estos 4 cables entre estas dos placas. No quiero usar protoboard ni cables sueltos. Es para un proyecto que va en un barco y necesita aguantar vibración y humedad."
+> "Necesito que me suelde estos 4 cables entre estas dos placas. Es para un GPS que va en un barco. Usar cables cortos (~5 cm) para que quede compacto."
 
-Le muestras esta tabla (o le muestras la pantalla del celular con esta imagen):
+Le muestras esta tabla:
 
 ```
 ╔═══════════════════════════════════════════════════════════╗
-║  SOLDAR 4 CABLES ENTRE ESP32 Y GPS NEO-6M               ║
+║  SOLDAR 4 CABLES ENTRE WT32-ETH01 Y GPS NEO-7M          ║
 ║                                                         ║
-║  ESP32 pin 3V3  ─── cable rojo ────→  GPS pin VCC      ║
-║  ESP32 pin GND  ─── cable negro ───→  GPS pin GND      ║
-║  ESP32 pin D16  ─── cable amarillo─→  GPS pin TX       ║
-║  ESP32 pin D17  ─── cable verde ──→   GPS pin RX       ║
+║  WT32-ETH01 5V    ─── rojo ────→  GPS VCC              ║
+║  WT32-ETH01 GND   ─── negro ───→  GPS GND              ║
+║  WT32-ETH01 RXD  ─── verde ───→  GPS TX               ║
+║  WT32-ETH01 TXD  ─── amarillo─→  GPS RX               ║
 ║                                                         ║
-║  ⚠️  IMPORTANTE: Usar 3V3, NO usar 5V ni VIN            ║
+║  ⚠️  IMPORTANTE: no invertir TX/RX (verde→RXD,          ║
+║      amarillo→TXD) ni cruzar 5V con GND                 ║
 ╚═══════════════════════════════════════════════════════════╝
 ```
 
 ### Diagrama visual para el técnico
 
 ```
-   ESP32 DevKit V1                Módulo GPS NEO-6M
-   ┌─────────────────┐            ┌────────────────┐
-   │  ┌───┐          │            │  ┌──────────┐  │
-   │  │USB│          │            │  │ Antena   │  │
-   │  └───┘          │            │  │ GPS      │  │
-   │                 │            │  └──────────┘  │
-   │  [BOOT] [EN]    │            │                │
-   │                 │            │                │
-   │  3V3 ●════rojo═══════════════●  VCC           │
-   │  GND ●═══negro═══════════════●  GND           │
-   │  D16 ●══amarillo═════════════●  TX            │
-   │  D17 ●═══verde═══════════════●  RX            │
-   │                 │            │                │
-   └─────────────────┘            └────────────────┘
+   WT32-ETH01 V1.4               Módulo GPS NEO-7M
+   ┌─────────────────┐           ┌────────────────┐
+   │  ┌───┐          │           │  ┌──────────┐  │
+   │  │RJ45│         │           │  │ Antena   │  │
+   │  └───┘          │           │  │ GPS      │  │
+   │                 │           │  └──────────┘  │
+   │                 │           │                │
+   │  5V   ●══rojo══════════════●  VCC            │
+   │  GND  ●══negro═════════════●  GND            │
+   │  RXD  ●══verde═════════════●  TX             │
+   │  TXD  ●══amarillo══════════●  RX             │
+   │                 │           │                │
+   └─────────────────┘           └────────────────┘
          │
-     Cable USB
-     (no se suelda,
-      se enchufa)
+     Cable Ethernet
+     (no se suelda, se enchufa)
 ```
 
-### Explicación de cada cable (para que entiendas qué le estás pidiendo)
+### Explicación de cada cable
 
-| Cable | De (ESP32) | A (GPS) | Qué hace |
-|-------|-----------|---------|----------|
-| 🔴 Rojo | **3V3** (3.3 voltios) | **VCC** | Le da energía al GPS. Como enchufar un aparato a la corriente. |
-| ⚫ Negro | **GND** (tierra) | **GND** | Cierra el circuito eléctrico. Siempre se necesita. |
-| 🟡 Amarillo | **D16** (GPIO 16) | **TX** | El GPS envía las coordenadas por este cable al ESP32. |
-| 🟢 Verde | **D17** (GPIO 17) | **RX** | El ESP32 puede enviar instrucciones al GPS por aquí. |
+| Cable | De (WT32-ETH01) | A (GPS) | Qué hace |
+|-------|----------------|---------|----------|
+| Rojo | **5V** | **VCC** | Le da energía al GPS (el módulo trae regulador y acepta 5V). |
+| Negro | **GND** (tierra) | **GND** | Cierra el circuito eléctrico. |
+| Verde | **RXD** (IO5) | **TX** | El GPS envía coordenadas por este cable. |
+| Amarillo | **TXD** (IO17) | **RX** | El ESP32 envía instrucciones al GPS por aquí. |
 
-> **¿Por qué TX del GPS va a D16 y no a TX del ESP32?**
-> Porque TX significa "transmitir" y RX significa "recibir". Lo que transmite uno, lo recibe el otro. Por eso se cruzan: TX del GPS → RX del ESP32 (D16), y viceversa.
-
-### ¿Qué debe quedar al final?
-
-Un bloque único con las dos placas unidas por 4 cables cortos soldados:
-
-```
-   ┌──────────────────────────────────────────────────────┐
-   │                                                      │
-   │   ┌──────────┐    4 cables soldados    ┌─────────┐  │
-   │   │  ESP32   │═════════════════════════│   GPS    │  │
-   │   │          │  (fijos, no se sueltan) │ (antena↑)│  │
-   │   └────┬─────┘                        └──────────┘  │
-   │        │ USB-C                                       │
-   │        │ (libre para enchufar)                       │
-   │                                                      │
-   │   LISTO PARA PRODUCCIÓN                              │
-   └──────────────────────────────────────────────────────┘
-```
-
-**Resultado:** Un dispositivo sólido. Solo necesitas enchufar un cable USB-C para alimentarlo y cargarle el programa. No hay nada que se suelte con el movimiento del barco.
+> **¿Por qué TX del GPS va a RXD?** TX = transmitir, RX = recibir. Se cruzan: lo que transmite uno, lo recibe el otro.
 
 ### Errores que el técnico NO debe cometer
 
 | ❌ Error | ✅ Correcto |
 |----------|------------|
-| Usar el pin **5V** o **VIN** del ESP32 | Usar el pin **3V3** (3.3 voltios) |
-| Soldar TX del GPS → TX del ESP32 | Soldar TX del GPS → **D16** del ESP32 |
-| Soldar RX del GPS → RX del ESP32 | Soldar RX del GPS → **D17** del ESP32 |
-| Cables largos (>10 cm) | Cables cortos (~5-8 cm) para que quede compacto |
-| Dejar puntas de estaño expuestas | Cubrir soldaduras con tubo termocontraíble o cinta |
-
-> ⚠️ **Si el técnico conecta VCC del GPS al pin 5V, el GPS se puede quemar.** Insiste en que sea el pin **3V3**.
-
-### ¿Y si no hay tienda de electrónica cerca?
-
-Puedes pedir las piezas por internet y usar **cables dupont hembra-hembra** como alternativa temporal (se enchufan sin soldar). Pero ten en cuenta que en un barco en movimiento, los cables enchufables **se sueltan** con la vibración. Para producción real, la soldadura es la opción correcta.
-
-Si decides usar dupont temporalmente:
-- Compra cables **hembra-hembra** (con hueco en ambos extremos)
-- Enchufa los mismos 4 pares de la tabla de arriba
-- Asegura cada conector con un punto de pegamento caliente para que no se suelte
+| Soldar TX del GPS → TXD | Soldar TX del GPS → **RXD** |
+| Soldar RX del GPS → RXD | Soldar RX del GPS → **TXD** |
+| Cruzar 5V con GND | 5V solo con VCC, GND solo con GND |
+| Cables largos (>10 cm) | Cables cortos (~5 cm) compactos |
+| Dejar puntas de estaño expuestas | Cubrir con tubo termocontraíble |
 
 ---
 
 ## 6. Ensamblaje paso a paso
 
-Si mandaste a soldar en la tienda (recomendado), el ensamblaje ya está hecho. Solo queda:
-
-### Paso 1 — Verificar visualmente
-
-Revisa que las soldaduras coincidan con esta tabla:
+### Paso 1 — Verificar las soldaduras
 
 ```
-✅  3V3 del ESP32 → VCC del GPS  (NO 5V, NO VIN)
-✅  GND del ESP32 → GND del GPS
-✅  D16 del ESP32 → TX del GPS   (¡cruzado!)
-✅  D17 del ESP32 → RX del GPS   (¡cruzado!)
+✅  5V del WT32-ETH01  → VCC del GPS
+✅  GND del WT32-ETH01 → GND del GPS
+✅  RXD del WT32-ETH01 → TX del GPS   (¡cruzado!)
+✅  TXD del WT32-ETH01 → RX del GPS   (¡cruzado!)
 ✅  Ningún cable toca otro cable
-✅  Las soldaduras están limpias (sin puentes de estaño entre pines)
+✅  Soldaduras limpias, sin puentes de estaño
 ```
 
-### Paso 2 — Conectar el cable USB
+### Paso 2 — Cargar el programa (firmware)
 
-1. Enchufa el cable USB al puerto del ESP32 (esto **no** se suelda, se enchufa y desenchufa)
-2. Enchufa el otro extremo al computador
-3. Si todo está bien, verás un **LED rojo fijo** en el ESP32 (indica que tiene energía)
+Esto se hace **una sola vez por dispositivo** usando el FT232RL:
+
+1. Conectar FT232RL al WT32-ETH01 con 4 cables dupont.
+   Orden de pines del YP-05 (izquierda → derecha): **DTR, RX, TX, VCC, CTS, GND**:
 
 ```
-   Computador
-       │
-   Cable USB (enchufable)
-       │
-       ▼
-   ┌──────────┐══════════════┌──────────┐
-   │  ESP32   │  soldado     │   GPS    │
-   │  ┌───┐   │              │ (antena) │
-   │  │USB│   │              │          │
-   │  └───┘   │              │          │
-   └──────────┘              └──────────┘
+YP-05 (pos. → cable)          WT32-ETH01
+Pos. 4  VCC (Plomo)  →   5V    (col 2, penúltimo pin, arriba de LINK)
+Pos. 6  GND (Verde)  →   GND   (col 1, pin 4, debajo de IO0)
+Pos. 3  TX  (Morado) →   RX0   (col 1, pin 2 — IO3)
+Pos. 2  RX  (Blanco) →   TX0   (col 1, pin 1 — IO1)
+Pos. 1  DTR (Negro)  →   ✗ NO CONECTAR
+Pos. 5  CTS (Azul)   →   ✗ NO CONECTAR
 ```
 
-**Ya está.** El dispositivo está ensamblado y listo para cargar el programa.
+2. Conectar puente entre **IO0** (col 1, pin 3) y **GND** (solo durante la carga)
+3. Enchufar FT232RL al computador por USB-C
+4. En VS Code + PlatformIO, abrir el proyecto
+5. Seleccionar el entorno **`wt32-eth01`** y presionar **Upload**
+6. **Durante "Connecting..."**: desconectar y reconectar el USB-C
+7. Cuando aparezca `Leaving... Hard resetting...`, **retirar el puente IO0→GND**
+8. Desconectar y reconectar el USB-C
+
+> El FT232RL se retira después. **No va en el barco.** Solo sirvió para cargar el programa. Las próximas actualizaciones se hacen **por red (OTA)**, sin cables.
+
+### Paso 3 — Probar el dispositivo
+
+1. Conectar cable Ethernet del WT32-ETH01 al router
+2. Alimentar con 5V (vía FT232RL conectado a USB para pruebas, o vía PoE)
+3. Abrir Monitor Serial de PlatformIO (115200 baud)
+4. Deberías ver:
+
+```
+╔══════════════════════════════════════════╗
+║  Tracking GPS  v1.2.0                   ║
+║  WT32-ETH01 + GPS → Ethernet → API      ║
+╚══════════════════════════════════════════╝
+[GPS] UART2 iniciado (RX=5, TX=17, 9600 baud)
+[ETH] Conectado. IP: 192.168.1.50
+```
 
 ---
 
 ## 7. Verificar que funciona
 
-### 7.1 — Primera vez: cargar el programa
+### Entender el LED azul
 
-La primera vez que usas un ESP32 nuevo, necesitas cargarle el programa (firmware). Esto se hace **una sola vez por dispositivo**:
-
-1. Conecta el ESP32 al computador por USB
-2. Abre Arduino IDE (software gratuito, ver [SETUP.md](SETUP.md) sección 3 para instalación)
-3. Abre el archivo `tracking-microcontrolador.ino`
-4. Presiona el botón **Upload** (flecha →)
-5. Espera 1-2 minutos hasta que diga "Done uploading"
-
-### 7.2 — Ver los mensajes del dispositivo
-
-1. En Arduino IDE, abre **Herramientas → Monitor Serial**
-2. Ajusta la velocidad a **115200 baud** (selector abajo a la derecha)
-3. Deberías ver algo como esto:
-
-```
-╔══════════════════════════════════════════╗
-║  Tracking GPS  v1.0.0                   ║
-║  ESP32 + GPS6MV2 → WiFi → API          ║
-╚══════════════════════════════════════════╝
-[GPS] UART2 iniciado (RX=16, TX=17, 9600 baud)
-[WIFI] AP: TRACKING-A1B2C3
-```
-
-Si ves esto, **el ESP32 y el GPS están funcionando**.
-
-### 7.3 — Entender el LED azul
-
-El ESP32 tiene un LED azul integrado en la placa. **No necesitas conectar ningún LED externo.** Este LED te dice qué está pasando:
+El WT32-ETH01 tiene un LED azul integrado que indica el estado:
 
 | Lo que ves en el LED | Significado | ¿Qué hacer? |
 |---------------------|-------------|-------------|
-| 🔵 Encendido fijo | Todo funciona bien | Nada, está OK |
-| 🔵 Parpadeo rápido (~3 veces/seg) | Buscando WiFi | Esperar, está conectándose |
-| 🔵 Parpadeo lento (~1 vez/seg) | Esperando señal GPS | Poner la antena GPS viendo al cielo |
-| 🔵 Parpadeo medio (~2 veces/seg) | Portal de configuración activo | Conectarse con el celular para configurar |
-| 🔵 2 flashes, pausa, 2 flashes... | Error de WiFi | La contraseña WiFi está mal. Resetear y reconfigurar |
-| 🔵 3 flashes, pausa, 3 flashes... | Error del servidor | El servidor no responde. Verificar URL y que el backend esté funcionando |
-| 🔵 5 flashes, pausa, 5 flashes... | Falta el token | No se configuró el token del dispositivo |
-| 🔵 Parpadeo muy muy rápido | Reseteando | Se está borrando la configuración |
+| Encendido fijo | Todo funciona bien | Nada, está OK |
+| Parpadeo rápido | Conectando a Ethernet | Esperar, está obteniendo IP del DHCP |
+| Parpadeo lento | Esperando señal GPS | Poner antena GPS viendo al cielo |
+| Parpadeo medio | Modo Instalación (página web activa) | Acceder a `tracking.local` desde el navegador |
+| 2 flashes, pausa, 2 flashes... | Error de red Ethernet | Verificar cable de red y router |
+| 3 flashes, pausa, 3 flashes... | Error del servidor | Verificar URL del API y token (botón Probar conexión) |
+| 5 flashes, pausa, 5 flashes... | Falta el token | Configurar token desde `tracking.local` |
+| Parpadeo muy muy rápido | Reseteando | Se está borrando la configuración |
 
-### 7.4 — El botón BOOT (reset)
+### El reset de fábrica (sin botón)
 
-El ESP32 tiene dos botones pequeños. El que dice **"BOOT"** sirve para resetear la configuración:
+El WT32-ETH01 **no tiene botón BOOT**. Para borrar la configuración:
 
 ```
-   ┌──────────────────────┐
-   │                      │
-   │  [BOOT]  [EN]        │  ← BOOT es el de la izquierda
-   │                      │     (puede variar según el modelo)
-   └──────────────────────┘
+IO0 (pin) ──unir con── GND (pin)  durante 4-5 segundos
+(con el dispositivo encendido — como un botón invisible)
 ```
 
-- **Presión normal** → No hace nada (es para programar)
-- **Mantener presionado 3 segundos** → Borra TODO (WiFi, token, URL) y reabre el portal de configuración
-
-Útil si te equivocaste en la configuración o si el barco cambia de red WiFi.
+- **Unir IO0 con GND por 4-5 segundos** → Borra TODO (token, URL, intervalo) y reinicia
+- Al arrancar de nuevo, entra en **Modo Instalación** (página en `tracking.local`)
 
 ---
 
-## 8. Configurar el dispositivo (portal cautivo)
+## 8. Configurar el dispositivo
 
-Cada dispositivo debe configurarse **individualmente** para el barco donde se va a instalar. Esto se hace desde un celular, sin tocar código.
+El dispositivo sin configurar se convierte solo en su propia página web (**Modo Instalación**). No se necesitan conocimientos de redes.
 
-### 8.1 — Antes de ir al barco: generar el token
+### 8.1 — Antes: generar el token (en nautic.run)
 
-Desde la aplicación web (en tu computador o celular):
+Desde la aplicación web (https://nautic.run):
 
 1. Entrar al sistema con tu usuario y contraseña
 2. Ir al módulo de **Embarcaciones**
 3. Seleccionar el barco donde va este dispositivo
 4. Sección **"Dispositivo IoT"** → presionar **"Generar Token"**
 5. **Copiar el token** — es un código largo tipo: `a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab`
-6. **Tener a mano el dominio del servidor** — ejemplo: `https://api.tudominio.com`
+6. **URL del servidor (producción):** `https://api.nautic.run/api/v1/device/ping`
 
-### 8.2 — En el barco: configurar por WiFi
+### 8.2 — Conectar y abrir la página
 
-1. **Encender** el ESP32 (conectar el USB a corriente)
-2. El LED azul parpadeará — significa que está esperando configuración
-3. En tu **celular**, ir a **Configuración WiFi** (ajustes del celular)
-4. Buscar la red que se llama **`TRACKING-XXXXXX`** (las X son letras/números únicos de este dispositivo)
-5. Conectarse con la contraseña: **`tracking123`**
-6. Se abre automáticamente una **página web en el celular** (portal cautivo)
-7. Si no se abre sola, abrir el navegador y escribir: **`192.168.4.1`**
+**Forma A — Cable directo a la laptop (no necesita router):**
+```
+Laptop ──cable de red──→ WT32-ETH01 (puerto RJ45)
+```
+**Forma B — En la red del barco:**
+```
+WT32-ETH01 ──→ Inyector PoE ──→ Router
+```
 
-### 8.3 — Llenar los campos del portal
+1. El LED parpadeará medio — significa que la página de configuración está activa
+2. Abrir el navegador (Chrome/Edge)
+3. Escribir en la barra de direcciones: **`http://tracking.local`**
+4. Aparece la página con la dirección de acceso y un aviso verde "Modo Instalación"
 
-En la página que se abre, llenar estos campos:
+### 8.3 — Llenar los campos del formulario
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │           TRACKING GPS — Configuración                  │
 │                                                         │
-│  WiFi SSID:          [Marina-Norte-5G          ]        │
-│  WiFi Password:      [clave-del-barco          ]        │
+│  Dirección de acceso:  http://tracking.local            │
 │                                                         │
 │  Token dispositivo:  [a3f8b2c1-9d4e-4f7a-b5c6..]       │
 │                                                         │
-│  URL del servidor:   [https://api.tudominio.com/api/v1/device/ping] │
+│  URL del servidor:   [https://api.nautic.run/api/v1/device/ping] │
 │                                                         │
 │  Intervalo (seg):    [10                       ]        │
 │  Nombre embarcación: [Lancha Esperanza         ]        │
 │                                                         │
-│              [ Guardar ]                                │
+│  [🔍 Probar conexión (token + URL)]                     │
+│  ✅ Conexión exitosa y token VÁLIDO. Puedes guardar.    │
+│                                                         │
+│              [ 💾 Guardar ]                             │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Detalle de cada campo:**
-
 | Campo | Qué poner | Ejemplo |
 |-------|-----------|--------|
-| **WiFi SSID** | El nombre de la red WiFi **del barco** (o del muelle/marina) | `Marina-Norte-5G` |
-| **WiFi Password** | La contraseña de esa red WiFi | `clave-secreta-123` |
-| **Token del dispositivo** | El token que generaste en el paso 8.1 (copiarlo completo) | `a3f8b2c1-9d4e-4f7a...` |
-| **URL del servidor** | El dominio completo de tu backend + la ruta del endpoint | `https://api.tudominio.com/api/v1/device/ping` |
-| **Intervalo de envío** | Cada cuántos segundos envía la ubicación (10 = cada 10 seg) | `10` |
+| **Token del dispositivo** | El token generado en paso 8.1 (copiarlo completo) | `a3f8b2c1-9d4e-4f7a...` |
+| **URL del servidor** | `https://api.nautic.run` + ruta del endpoint | `https://api.nautic.run/api/v1/device/ping` |
+| **Intervalo de envío** | Cada cuántos segundos envía ubicación (10 = cada 10 seg) | `10` |
 | **Nombre embarcación** | Nombre para identificar este barco (opcional) | `Lancha Esperanza` |
 
 > **IMPORTANTE — URL del servidor:**
-> - En **desarrollo local** (tu PC con XAMPP): `http://192.168.1.100:8000/api/v1/device/ping`
-> - En **producción** (con dominio): `https://api.tudominio.com/api/v1/device/ping`
+> - En **producción**: `https://api.nautic.run/api/v1/device/ping`
 > - Siempre debe terminar en `/api/v1/device/ping`
-> - Si el dominio cambia después, deberás resetear el dispositivo (botón BOOT 3s) y reconfigurar
 
-### 8.4 — Verificar que se conectó
+### 8.4 — Probar la conexión antes de guardar (botón verde)
 
-Después de presionar "Guardar":
+Antes de guardar, presionar el botón **"🔍 Probar conexión (token + URL)"**:
 
-1. El celular se desconecta de la red TRACKING-XXXXXX (es normal)
-2. El ESP32 se reinicia solo
-3. Intenta conectarse al WiFi del barco
-4. Si el LED queda **encendido fijo** → todo bien, está funcionando
-5. Si parpadea → ver tabla de LEDs en sección 7.3
+- **Mensaje verde** "Conexión exitosa y token VÁLIDO" → presionar **Guardar** ✅
+- **Mensaje rojo** → revisar el texto:
+  - "TOKEN INVALIDO (401/403)" → el token no corresponde → pedir otro al administrador
+  - "No se pudo conectar" → la URL está mal o no hay internet → revisar el campo URL
 
-**Desde la app web** puedes verificar que el barco aparece como "Online" en la sección de dispositivos.
+El dispositivo **se reinicia solo** después de Guardar y queda listo para montar.
 
-### 8.5 — ¿Cada barco tiene configuración distinta?
+### 8.5 — Importar configuración por JSON (alternativa rápida)
 
-**Sí.** Cada barco tiene su propia red WiFi y su propio token. El dominio del servidor es el mismo para todos, pero se configura en cada dispositivo:
+1. Hacer clic en **"Importar Config JSON"**
+2. Pegar el JSON completo, por ejemplo:
+   ```json
+   {"token":"a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab","api_url":"https://api.nautic.run/api/v1/device/ping","interval":10,"vessel_name":"Lancha Esperanza"}
+   ```
+3. Clic en **"Aplicar"** → los campos se llenan solos
+4. Clic en **"Probar conexión"** → si sale verde, clic en **"Guardar"**
 
-| Barco | WiFi | Token | URL del servidor |
-|-------|------|-------|------------------|
-| Lancha Esperanza | `Marina-Norte-5G` | `abc123...` | `https://api.tudominio.com/api/v1/device/ping` |
-| Pesquero San Juan | `Puerto-Sur-WiFi` | `def456...` | `https://api.tudominio.com/api/v1/device/ping` |
-| Yate Libertad | `Muelle-Este` | `ghi789...` | `https://api.tudominio.com/api/v1/device/ping` |
+### 8.6 — ¿Cada barco tiene configuración distinta?
 
-El firmware es **idéntico** en los 3. La diferencia es solo la configuración del portal.
+**Sí.** Cada barco tiene su propio token. El dominio del servidor es el mismo para todos:
+
+| Barco | Token | URL del servidor |
+|-------|-------|------------------|
+| Lancha Esperanza | `abc123...` | `https://api.nautic.run/api/v1/device/ping` |
+| Pesquero San Juan | `def456...` | `https://api.nautic.run/api/v1/device/ping` |
+| Yate Libertad | `ghi789...` | `https://api.nautic.run/api/v1/device/ping` |
+
+El firmware es **idéntico** en los 3. La diferencia es solo la configuración web.
 
 ---
 
 ## 9. Montaje en el barco
 
-### 9.1 — Diagrama de instalación completa
+### 9.1 — Diagrama de instalación completa (PoE)
 
-La caja del dispositivo (ESP32 + GPS) va **afuera**, donde la antena GPS puede ver el cielo. El router WiFi (Starlink) queda **dentro de la cabina**. El cable USB-C pasa por la canaleta de cables del Starlink para alimentar el dispositivo.
+La caja del dispositivo (WT32-ETH01 + GPS) va **afuera**, donde la antena GPS puede ver el cielo. El cable Ethernet llega desde dentro de la cabina:
 
 ```
    DENTRO DE CABINA                           AFUERA (ve el cielo)
    ┌──────────────────────────────┐           ┌──────────────────────┐
-   │                              │  Cable    │  Caja plástica IP65  │
-   │  Fuente 5V USB               │  USB-C    │                     │
-   │  (cargador, Starlink,        │  por      │  ┌──────┐══┌─────┐  │
-   │   powerbank, etc.)           │  canaleta │  │ESP32 │  │ GPS │  │
-   │         │                    │  Starlink │  │      │  │(↑)  │  │
-   │         └────────────────────┼───────────┼─→│USB-C │  │cielo│  │
-   │                              │           │  └──────┘  └─────┘  │
-   │  Router WiFi (Starlink)      │           │                     │
-   │                              │           └──────────────────────┘
-   └──────────────────────────────┘
+   │                              │           │  Caja plástica IP65  │
+   │  Router/Switch               │  Cable    │                     │
+   │  (Starlink, 4G LTE)          │  Ethernet │  ┌────────┐══┌────┐ │
+   │        │                     │  (UTP)    │  │WT32    │  │GPS │ │
+   │   ┌────┴────┐    ┌────────┐  │──────────→│  │ETH01   │  │(↑) │ │
+   │   │ Inyector│    │Switch  │  │           │  │(RJ45)  │  │cielo│ │
+   │   │ PoE 48V │    │/Router │  │           │  └────────┘  └────┘ │
+   │   └─────────┘    └────────┘  │           │    ↑               │
+   │                              │           │  Splitter PoE       │
+   │                              │           │  48V→5V/2A          │
+   └──────────────────────────────┘           └──────────────────────┘
 ```
 
-### 9.2 — Ubicación de la caja (afuera)
+### 9.2 — Alimentación por PoE (producción)
+
+El mismo cable Ethernet que lleva los datos también lleva la electricidad:
+
+1. Dentro de la cabina: conectar **inyector PoE 48V** a la corriente y al router/switch
+2. El cable UTP sale hacia afuera llevando datos + 48V
+3. Junto al WT32-ETH01, conectar el **splitter PoE** (convierte 48V → 5V/2A)
+4. Conectar los 5V del splitter a los pines **5V** y **GND** del WT32-ETH01
+5. Conectar el puerto RJ45 del WT32-ETH01 al puerto LAN del splitter
+
+### 9.3 — Ubicación de la caja (afuera)
 
 **Reglas importantes:**
-- La caja va **afuera**, en un lugar donde la antena GPS pueda "ver" el cielo. No ponerla debajo de techos de metal.
-- La caja debe ser de **plástico/PVC** (no metálica). El plástico no bloquea ni la señal GPS ni el WiFi.
-- Si es posible, ponerla a la **sombra** (bajo un alero plástico, debajo de un asiento en cubierta). Esto evita que se caliente mucho al sol.
-- Si tiene que estar al sol, usar caja de **color blanco o claro** (absorbe menos calor).
-- La **antena GPS** (cuadrado plano del módulo) debe apuntar **hacia arriba** (hacia la tapa de la caja, que mira al cielo).
-
-### 9.3 — Alimentación por USB-C
-
-El ESP32 se alimenta por su **puerto USB-C** con cualquier fuente de 5V. El cable USB-C sale desde dentro de la cabina hacia la caja afuera, pasando por la canaleta del Starlink.
-
-```
-  Fuente 5V (dentro de cabina)
-  (cargador, USB del Starlink, powerbank, etc.)
-       │
-   Cable USB-C
-       │ (por canaleta del Starlink hacia afuera)
-       │
-  ┌────┴──────────────────────────────────┐
-  │  Caja plástica IP65 (AFUERA)          │
-  │  ┌──────────┐═══════════┌──────────┐  │
-  │  │  ESP32   │  soldado  │   GPS    │  │
-  │  │  (USB-C) │  (corto)  │ (antena↑)│  │
-  │  └──────────┘           └──────────┘  │
-  └───────────────────────────────────────┘
-```
-
-Así de simple. No se necesita convertidor de voltaje ni fusible porque el ESP32 ya regula internamente lo que recibe por USB-C (5V).
-
-### 9.4 — Armar la caja estanca
-
-**Pasos:**
-1. Hacer un agujero pequeño en la caja para pasar el cable USB-C (con prensaestopa PG7 o un agujero sellado con silicona)
-2. Meter el ESP32 y GPS dentro, con la antena GPS **apuntando hacia la tapa** (hacia arriba/cielo)
-3. Pasar el cable USB-C por el agujero, sellar con silicona o prensaestopa
-4. Fijar la caja al barco con bridas plásticas, tornillos de acero inoxidable, o cinta doble cara industrial (VHB)
-5. El cable USB-C va por la **canaleta del Starlink** hasta dentro de la cabina, donde se conecta a la fuente de 5V
+- Caja de **plástico/PVC** (no metálica). El plástico no bloquea la señal GPS.
+- La antena GPS debe apuntar hacia **arriba** (la cara de metal al cielo).
+- Si es posible, ponerla a la **sombra** (bajo alero plástico).
+- Si tiene que estar al sol, usar caja de color **blanco o claro**.
+- Fijar con bridas, tornillos de acero inoxidable o cinta VHB.
 
 ---
 
 ## 10. Preguntas frecuentes
 
-### ¿Necesito comprar un LED aparte?
-**No.** El ESP32 DevKit ya tiene un LED azul integrado en la placa (en el pin GPIO 2). El firmware lo usa automáticamente para indicar el estado. No necesitas comprar ni conectar ningún LED externo.
+### ¿Necesito WiFi en el barco?
+**No.** Este dispositivo usa cable Ethernet (UTP), el mismo que usa una computadora de escritorio. No necesita WiFi para nada. El barco solo necesita un router/switch con puerto Ethernet disponible.
 
-### ¿Necesito comprar un botón aparte?
-**No.** El ESP32 DevKit ya tiene un botón marcado "BOOT" que usamos para resetear la configuración (mantener 3 segundos). No necesitas comprar botones adicionales.
+### ¿Por qué Ethernet y no WiFi?
+Ethernet es más confiable en ambientes marítimos: no se desconecta con el oleaje, no tiene interferencia de otros barcos, y el alcance no es problema. Además permite alimentación por PoE (datos + energía en un solo cable).
+
+### ¿Necesito comprar un LED aparte?
+**No.** El WT32-ETH01 ya tiene un LED azul integrado que el firmware usa para indicar el estado.
+
+### ¿El FT232RL va en el barco?
+**No.** Se usa únicamente para cargar el programa la primera vez (5 minutos). Se desconecta después. En el barco, el dispositivo se alimenta por PoE.
 
 ### ¿Necesito saber soldar?
-**No.** Le pides al técnico de la tienda de electrónica que suelde las 4 conexiones (ver sección 5). Tú solo llevas las piezas y le muestras la tabla de conexiones. Cuesta $1–3 USD en la mayoría de tiendas.
-
-### ¿Puedo usar un ESP32 diferente?
-Sí, cualquier placa basada en ESP32 con WiFi funciona. Solo asegúrate de que tenga:
-- Puerto USB (para programar y alimentar)
-- Pines GPIO 16 y GPIO 17 disponibles (para el GPS)
-- Al menos 4MB de Flash
-
-Modelos compatibles: ESP32 DevKit V1, ESP32-WROOM-32, NodeMCU-32S, ESP32-S3 DevKit (ajustar pines).
+**No.** Le pides al técnico de la tienda de electrónica que suelde las 4 conexiones del GPS al WT32-ETH01.
 
 ### ¿Puedo usar otro módulo GPS?
-Sí, cualquier GPS que hable protocolo NMEA por UART a 9600 baud. Opciones compatibles:
-- **GPS6MV2 / NEO-6M** ← recomendado (barato, probado)
-- NEO-7M (mejor precisión)
-- NEO-8M (mejor precisión + GLONASS)
-- BN-220 / BN-880 (más pequeños, con brújula)
+Sí, cualquier GPS que hable protocolo NMEA por UART a 9600 baud:
+- **NEO-7M** — recomendado (mejor precisión que 6M)
+- NEO-6M
+- NEO-8M (GLONASS + GPS)
+- BN-220 / BN-880
 
 ### ¿El GPS funciona dentro de un edificio?
-**No confiablemente.** El GPS necesita señal de satélites, que solo llega bien al aire libre. Dentro de un edificio o bajo un techo de concreto/metal, la señal se debilita mucho. En un barco, asegúrate de que la antena esté expuesta al cielo.
+**No confiablemente.** Necesita vista al cielo. En el barco, asegúrate de que la antena esté al aire libre (cara de metal hacia arriba).
 
-### ¿Cuántos dispositivos puedo tener?
-**Ilimitados.** Cada barco tiene su propio ESP32 + GPS con un token único. El firmware es idéntico para todos. Solo varía la configuración (WiFi, token, URL) que se pone desde el portal cautivo.
+### ¿Qué pasa si se va la luz?
+El WT32-ETH01 se reinicia solo cuando vuelve la energía. Toda la configuración (token, URL, intervalo) está guardada en memoria permanente (NVS) y **no se pierde** aunque se desconecte completamente.
 
-### ¿Qué pasa si se va la luz / se desconecta?
-El ESP32 se reinicia automáticamente cuando vuelve la corriente. La configuración (WiFi, token, URL, intervalo) está guardada en memoria permanente (NVS) y **no se pierde** aunque se desconecte. Simplemente vuelve a conectarse y sigue enviando datos.
-
-### ¿Qué pasa si el barco sale de la zona WiFi?
-El dispositivo detecta que perdió WiFi, el LED mostrará 2 flashes (error WiFi), e intentará reconectarse cada 30 segundos. Cuando vuelva a estar en rango, se conecta solo.
-
-> **Limitación actual:** Este sistema funciona con WiFi, no con datos móviles. El barco necesita estar en rango de una red WiFi para enviar datos. Para cobertura mar adentro se necesitaría un módulo celular (4G/LTE), que se puede agregar como mejora futura.
-
-### ¿Puedo poner la caja debajo del techo metálico de la cabina?
-**No.** El metal bloquea completamente la señal GPS. La caja debe ir **afuera**, en un lugar donde la antena GPS pueda ver el cielo directamente. Una caja de **plástico** no bloquea ni la señal GPS ni el WiFi, así que el plástico no es problema. El problema es solo el metal encima.
-
-### ¿Cuánto consume de electricidad?
-Muy poco. El ESP32 consume en promedio ~80mA (en reposo) con picos de ~250mA (al transmitir WiFi). Equivale a menos de 0.5W constantemente. Un powerbank de 10.000mAh dura ~2–3 días. Un cargador de celular normal (5V 1A) sobra de potencia.
+### ¿Cuánto consume?
+Muy poco. El WT32-ETH01 consume ~100-200mA a 5V (menos de 1W). El splitter PoE entrega hasta 2A (10W), más que suficiente.
 
 ### ¿Necesito saber programar?
-**No.** El firmware se carga una sola vez usando Arduino IDE (es apretar un botón). La configuración de cada barco se hace desde el celular (portal web). Y la gestión remota se hace desde la aplicación web. No necesitas tocar código.
+**No.** El firmware se carga una sola vez (es apretar un botón). La configuración de cada barco se hace desde una página web fácil (`tracking.local`) con un botón que prueba la conexión. Y la gestión diaria se hace desde la aplicación web (nautic.run).
 
-### ¿Puedo flashear muchos ESP32 con el mismo programa?
-**Sí.** De hecho, esa es la idea. Flasheas 10, 50 o 100 ESP32 con el mismo archivo, y luego cada uno se configura individualmente desde su portal cautivo. El programa es genérico; la personalización es por configuración.
+### ¿Puedo flashear muchos dispositivos con el mismo programa?
+**Sí.** Flasheas 10, 50 o 100 WT32-ETH01 con el mismo archivo, cada uno se configura individualmente desde su página. El firmware es genérico; la personalización es por configuración.
 
 ---
 
 ## Resumen: de la tienda a funcionando
 
 ```
-Paso 1  │  COMPRAR en tienda de electrónica:
-        │    ESP32 DevKit V1 (USB-C) + GPS NEO-6M + cable USB-C
+Paso 1  │  COMPRAR:
+        │    WT32-ETH01 + GPS NEO-7M + FT232RL + Inyector PoE + Splitter PoE
         │
-Paso 2  │  PEDIR AL TÉCNICO que suelde 4 cables:
-        │    ESP32 3V3  → GPS VCC  (rojo)
-        │    ESP32 GND  → GPS GND  (negro)
-        │    ESP32 D16  → GPS TX   (amarillo)
-        │    ESP32 D17  → GPS RX   (verde)
+Paso 2  │  PEDIR AL TÉCNICO que suelde 4 cables (GPS al WT32-ETH01):
+        │    WT32-ETH01 5V   → GPS VCC   (rojo)
+        │    WT32-ETH01 GND  → GPS GND   (negro)
+        │    WT32-ETH01 RXD  → GPS TX    (verde)
+        │    WT32-ETH01 TXD  → GPS RX    (amarillo)
         │
-Paso 3  │  EN TU PC: Conectar USB-C → Abrir Arduino IDE
-        │    → Cargar el programa (una sola vez, un botón)
+Paso 3  │  EN TU PC: Conectar FT232RL → puente IO0→GND
+        │    → Cargar programa (una sola vez, un botón)
+        │    (las próximas actualizaciones se hacen por RED, sin cables)
         │
-Paso 4  │  EN LA APP WEB: Generar token para el barco
+Paso 4  │  EN LA APP WEB (nautic.run): Generar token para el barco
         │
-Paso 5  │  EN EL BARCO:
-        │    • Instalar caja plástica IP65 AFUERA (GPS ve el cielo)
-        │    • Pasar cable USB-C por canaleta del Starlink
-        │    • Conectar USB-C a fuente 5V dentro de cabina
-        │      (cargador, USB del Starlink, powerbank)
-        │    • Configurar con el celular:
-        │      WiFi "TRACKING-XXXXXX" (clave: tracking123)
-        │      En el portal poner:
-        │      • WiFi del barco (nombre y contraseña)
+Paso 5  │  CONFIGURAR (lo hace el técnico en 2 minutos):
+        │    • Conectar UN cable de red: laptop → WT32-ETH01
+        │    • Navegador → http://tracking.local
+        │    • En el formulario poner:
         │      • Token del dispositivo
-        │      • Dominio: https://api.tudominio.com/api/v1/device/ping
+        │      • Dominio: https://api.nautic.run/api/v1/device/ping
         │      • Intervalo de envío (10 segundos)
+        │    • Botón "Probar conexión" → mensaje VERDE
+        │    • Botón "Guardar" → se reinicia solo
         │
-Paso 6  │  LED azul encendido fijo = funcionando ✓
+Paso 6  │  EN EL BARCO:
+        │    • Instalar caja plástica IP65 AFUERA (GPS ve el cielo)
+        │    • Conectar cable Ethernet (UTP)
+        │    • Conectar splitter PoE (5V) a WT32-ETH01
+        │
+Paso 7  │  LED azul encendido fijo = funcionando ✓
         │
         ▼  LISTO — el barco aparece en la aplicación web
 ```

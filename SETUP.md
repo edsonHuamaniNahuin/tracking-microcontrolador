@@ -1,208 +1,286 @@
 # Guía de Instalación y Configuración
 
-Guía paso a paso para instalar, configurar y desplegar el sistema de tracking GPS en embarcaciones.
+Guía técnica paso a paso para instalar, flashear, configurar y desplegar el sistema de tracking GPS en embarcaciones usando WT32-ETH01 V1.4 apuntando a **producción (nautic.run)**.
 
 ---
 
 ## 1. Requisitos de hardware
 
-### Por cada barco
+### Componentes del dispositivo
 
-| Componente | Modelo recomendado | Precio aprox. | Notas |
-|------------|--------------------|---------------|-------|
-| Microcontrolador | **ESP32 DevKit V1** (con USB) | $3–5 USD | Debe tener puerto USB para flashear y alimentar |
-| Módulo GPS | **GPS6MV2** (HW-248, u-blox NEO-6M) | $3–5 USD | Antena cerámica incluida |
-| Cable USB | Micro-USB o USB-C (según el DevKit) | $1 USD | Para flashear y alimentar desde cargador/powerbank |
-| Fuente de alimentación | Cargador USB 5V / Powerbank | $5–10 USD | Mínimo 500mA. En barcos con 12V, usar conversor a 5V USB |
-| Cables Dupont | 4 cables hembra-hembra | $1 USD | Conexión GPS ↔ ESP32 |
+| Componente | Modelo | Precio aprox. | Notas |
+|------------|--------|---------------|-------|
+| Microcontrolador | **WT32-ETH01 V1.4** | $8–12 USD | ESP32 con Ethernet LAN8720 integrado |
+| Programador | **FT232RL YP-05** (USB-C) | $3–5 USD | Solo para flashear. Se desconecta en producción. |
+| Módulo GPS | **NEO-7M** / NEO-6M | $3–5 USD | Antena cerámica, soldado a UART2 |
+| Cable Ethernet | UTP Cat5e/Cat6 | $2–5 USD | Conexión de red en producción |
+| Inyector PoE | PoE Activo 48V | $8–15 USD | Alimentación remota por cable de red |
+| Splitter PoE | 48V → 5V/2A | $5–10 USD | Convierte PoE a 5V para el WT32-ETH01 |
+| Cables Dupont | Hembra-hembra (4 uds) | $1 USD | Conexión FT232RL ↔ WT32-ETH01 (solo flasheo) |
 
-### Herramientas
+### Infraestructura por barco
 
-- PC con **Arduino IDE 2.x** instalado (solo para flashear, se hace una vez)
-- Celular o tablet con WiFi (para configurar cada dispositivo)
+- Router/Switch con puerto Ethernet disponible (ej: Starlink, router 4G LTE)
+- Cable UTP desde el router hasta la ubicación del dispositivo
+- **No se requiere WiFi en el barco** — la conexión es 100% cableada
 
 ---
 
 ## 2. Conexiones físicas
 
-4 cables entre el ESP32 y el GPS:
+### A. GPS ↔ WT32-ETH01 (Soldado permanentemente)
 
 ```
-ESP32 DevKit V1              GPS6MV2 (HW-248)
-───────────────              ─────────────────
-  3V3  ──────────────────→   VCC
-  GND  ──────────────────→   GND
-  GPIO 16 (RX2) ─────────→  TX
-  GPIO 17 (TX2) ─────────→  RX
+WT32-ETH01 V1.4              GPS NEO-7M/6M
+────────────────────         ─────────────
+  5V    ─────────────────→   VCC    (Rojo)
+  GND   ─────────────────→   GND    (Negro)
+  RXD   ─────────────────→   TX     (Verde)
+  TXD   ─────────────────→   RX     (Amarillo)
 ```
 
-> **Importante:** Alimentar el GPS desde el pin **3V3** del ESP32 (no 5V). El GPS6MV2 opera a 3.3V.
+| Pin GPS | Color | Pin WT32-ETH01 | Función |
+|---------|-------|---------------|---------|
+| VCC | Rojo | 5V | Alimentación del módulo (el módulo trae regulador) |
+| GND | Negro | GND | Tierra común |
+| TX | Verde | RXD (IO5) | Datos GPS → ESP32 |
+| RX | Amarillo | TXD (IO17) | Comandos → GPS |
 
-### Diagrama visual
+> **UART2** se usa para el GPS y dejar libre UART0 para programación/monitoreo. La regla de memoria: **VERDE → TX del GPS → RXD del ESP32** y **AMARILLO → RX del GPS → TXD del ESP32**.
+
+### B. FT232RL (YP-05) ↔ WT32-ETH01 (Solo para programar)
+
+El jumper del YP-05 debe estar en **5V**. Orden de pines del YP-05 (izquierda → derecha): **DTR, RX, TX, VCC, CTS, GND**.
 
 ```
-  ┌──────────────────┐         ┌─────────────────┐
-  │   ESP32 DevKit   │         │    GPS6MV2      │
-  │                  │         │                 │
-  │  3V3  ●──────────┼────────→│ VCC             │
-  │  GND  ●──────────┼────────→│ GND             │
-  │  D16  ●──────────┼────────→│ TX              │
-  │  D17  ●──────────┼────────→│ RX              │
-  │                  │         │                 │
-  │  [USB] ← PC/5V  │         │   [Antena GPS]  │
-  └──────────────────┘         └─────────────────┘
+FT232RL YP-05                 WT32-ETH01 V1.4
+─────────────────             ────────────────
+  VCC  (plomo)  ──────────→   5V     (Col 2, penúltimo pin — arriba de LINK)
+  GND  (verde)  ──────────→   GND    (Col 1, 4to pin — debajo de IO0)
+  TX   (morado) ──────────→   RX0    (Col 1, 2do pin — IO3)
+  RX   (blanco) ──────────→   TX0    (Col 1, 1er pin — IO1)
+  CTS  (azul)   ──────────→   NO CONECTAR
+  DTR  (negro)  ──────────→   NO CONECTAR
 ```
+
+| Pin YP-05 | Posición | Cable | Pin WT32-ETH01 | Ubicación |
+|-----------|----------|-------|----------------|-----------|
+| VCC | 4 | Plomo (gris) | 5V | Col 2, penúltimo pin (arriba de Link) |
+| GND | 6 | Verde | GND | Col 1, 4to pin (debajo de IO0) |
+| TX | 3 | Morado | IO3 (RX0) | Col 1, 2do pin |
+| RX | 2 | Blanco | IO1 (TX0) | Col 1, 1er pin |
+| CTS | 5 | Azul | — | No se usa (dejar sin conectar) |
+| DTR | 1 | Negro | — | No se usa (dejar sin conectar) |
+
+> **IMPORTANTE:** Los pines CTS y DTR del YP-05 **no se conectan a nada**. Solo se usan los 4 pines: VCC, GND, TX, RX. El FT232RL se desconecta después de flashear. En producción, el dispositivo se alimenta por PoE y solo tiene conectado el cable Ethernet y el GPS.
 
 ---
 
 ## 3. Preparar el entorno de desarrollo
 
-### 3.1 Instalar Arduino IDE
+### 3.1 Instalar VS Code + PlatformIO
 
-Descargar desde: https://www.arduino.cc/en/software
+1. Descargar **Visual Studio Code**: https://code.visualstudio.com
+2. Instalar la extensión **PlatformIO IDE** desde el marketplace
+3. Abrir la carpeta del proyecto (`tracking-microcontrolador`)
 
-### 3.2 Agregar soporte para ESP32
+### 3.2 El archivo `platformio.ini` ya está configurado
 
-1. Abrir Arduino IDE
-2. **Archivo → Preferencias**
-3. En "Gestor de URLs adicionales de tarjetas", agregar:
-   ```
-   https://espressif.github.io/arduino-esp32/package_esp32_index.json
-   ```
-4. **Herramientas → Placa → Gestor de tarjetas**
-5. Buscar **esp32** (por Espressif) → **Instalar**
+```ini
+[platformio]
+src_dir = .
+default_envs = wt32-eth01
 
-### 3.3 Instalar librerías
+[env:wt32-eth01]        ; flasheo por cable (YP-05)
+platform = espressif32
+board = wt32-eth01
+framework = arduino
+upload_speed = 115200
+monitor_speed = 115200
 
-Desde **Herramientas → Gestor de Librerías**, instalar:
+[env:wt32-eth01-ota]    ; actualización por RED (sin cables)
+upload_protocol = espota
+upload_port = <IP-del-dispositivo>
+```
 
-| Librería | Buscar como | Versión |
-|----------|------------|---------|
-| WiFiManager | `WiFiManager` (por tzapu) | 2.x |
-| TinyGPSPlus | `TinyGPSPlus` (por Mikal Hart) | 1.x |
-| ArduinoJson | `ArduinoJson` (por Benoît Blanchon) | 7.x |
+Las librerías (`TinyGPSPlus`, `ArduinoJson`, ETH/WebServer/ESPmDNS/ArduinoOTA) se descargan solas la primera vez.
 
-### 3.4 Configurar la placa
-
-En **Herramientas**:
+### 3.3 Configurar la placa (botón Upload con entorno `wt32-eth01`)
 
 | Opción | Valor |
 |--------|-------|
-| Placa | ESP32 Dev Module |
+| Placa | WT32-ETH01 (board `wt32-eth01`) |
 | Upload Speed | 115200 |
-| CPU Frequency | 240MHz |
-| Flash Frequency | 80MHz |
-| Flash Size | 4MB (32Mb) |
-| Partition Scheme | Default 4MB with spiffs |
-| Puerto | El que aparezca al conectar el USB (ej: COM3) |
+| Puerto | El que aparezca al conectar el FT232RL (ej: COM3) |
 
 ---
 
-## 4. Configuración pre-flasheo
+## 4. Configuración pre-flasheo (`config.h`)
 
-### 4.1 URL del API (`config.h`)
+### 4.1 URL del API (producción)
 
-Antes de flashear, editar `config.h` y ajustar la URL del backend:
+`config.h` ya trae la URL de **producción** por defecto (no requiere edición):
 
 ```cpp
-// ── Desarrollo local (XAMPP) ──────────────────────────────
-#define DEFAULT_API_URL  "http://192.168.1.100:8000/api/v1/device/ping"
+// ── Producción (default — nautic.run) ──────────────────────
+#define DEFAULT_API_URL  "https://api.nautic.run/api/v1/device/ping"
 
-// ── Producción (con dominio) ──────────────────────────────
-// #define DEFAULT_API_URL  "https://api.tudominio.com/api/v1/device/ping"
+// ── Solo desarrollo local (XAMPP) — opcional ───────────────
+// #define DEFAULT_API_URL  "http://192.168.1.43:8001/api/v1/device/ping"
 ```
 
-> **Nota:** Esta URL es solo el valor por defecto. Se puede cambiar **sin re-flashear** desde el portal cautivo de cada dispositivo o remotamente desde la app.
+> **Nota:** Esta URL es solo el valor por defecto. En el flujo normal de instalación el técnico la escribe (o la trae precargada) desde la página `tracking.local` — no hace falta re-flashear.
 
-### 4.2 Otros valores ajustables en `config.h`
+### 4.2 Parámetros Ethernet y GPS
 
-| Constante | Valor por defecto | Descripción |
-|-----------|------------------|-------------|
-| `DEFAULT_API_URL` | `http://192.168.1.100:8000/api/v1/device/ping` | Endpoint del backend |
-| `DEFAULT_SEND_INTERVAL` | `10000` (10s) | Cada cuántos ms envía datos. Configurable remotamente. |
-| `GPS_RX_PIN` / `GPS_TX_PIN` | `16` / `17` | Pines UART del GPS. Cambiar solo si usas otros pines. |
-| `AP_PASSWORD` | `tracking123` | Contraseña del portal cautivo. Cambiar para seguridad. |
-| `AP_TIMEOUT_SECONDS` | `180` (3 min) | Tiempo antes de cerrar el portal si nadie configura. |
+Ya están configurados para WT32-ETH01 V1.4. Verificar en `config.h`:
+
+```cpp
+// ── Ethernet (LAN8720) ─────────────
+#define ETH_PHY_ADDR   1
+#define ETH_PHY_MDC    23
+#define ETH_PHY_MDIO   18
+#define ETH_PHY_TYPE   ETH_PHY_LAN8720
+#define ETH_PHY_POWER  16   // GPIO16 alimenta el PHY
+#define ETH_CLK_MODE   ETH_CLOCK_GPIO0_IN
+
+// ── GPS (UART2) ────────────────────
+#define GPS_RX_PIN 5   // IO5 (RXD)
+#define GPS_TX_PIN 17  // IO17 (TXD)
+#define GPS_BAUD 9600
+```
 
 ---
 
-## 5. Flashear el firmware
+## 5. Flashear el firmware (primera vez — con YP-05)
 
-1. Conectar el ESP32 al PC por USB
-2. Abrir `tracking-microcontrolador.ino` en Arduino IDE
-3. Seleccionar la placa y puerto correcto
-4. Presionar **Upload** (→)
-5. Esperar a que diga "Done uploading"
-6. Abrir **Monitor Serial** (115200 baud) para verificar que arranca
+### Protocolo de sincronización (Modo Flash)
 
-Salida esperada al primer arranque:
+El WT32-ETH01 V1.4 **no tiene auto-reset**. Para programar:
+
+1. **Puente de activación:** Conectar **IO0** a **GND** (IO0 es el 3er pin de la columna 1)
+2. Enchufar el cable USB-C del FT232RL a la PC
+3. En PlatformIO, seleccionar el entorno **`wt32-eth01`** y presionar **Upload**
+4. **Durante "Connecting..."**: desconectar y reconectar el USB-C (el chip arranca en modo descarga con el puente puesto)
+5. Al ver `Leaving... Hard resetting...`, **retirar el puente IO0→GND**
+6. Desconectar y reconectar el USB para que ejecute el programa
+
+> **Importante:** el dispositivo no debe tener otra fuente de energía durante el flasheo (desconectar el PoE/DC jack). La energía debe venir solo del YP-05.
+
+### Salida esperada (Monitor Serial a 115200 baud)
+
 ```
 ╔══════════════════════════════════════════╗
-║  Tracking GPS  v1.0.0                   ║
-║  ESP32 + GPS6MV2 → WiFi → API          ║
+║  Tracking GPS  v1.2.0                   ║
+║  WT32-ETH01 + GPS → Ethernet → API      ║
 ╚══════════════════════════════════════════╝
-[NVS] Configuracion cargada
-[GPS] UART2 iniciado (RX=16, TX=17, 9600 baud)
-[MAIN] Sin token. El tecnico debe configurar via portal.
-[WIFI] AP: TRACKING-A1B2C3
+[GPS] UART2 iniciado (RX=5, TX=17, 9600 baud)
+[MAIN] Sin token. Iniciando modo instalacion.
+[ETH] MODO INSTALACION (dispositivo sin configuracion)
+[ETH] >>> Abre el navegador en: http://tracking.local <<<
 ```
 
-> **El firmware se flashea una sola vez.** Los mismos archivos sirven para todos los barcos. La personalización por barco se hace en el paso siguiente.
+> **El firmware se flashea una sola vez por dispositivo.** Las actualizaciones posteriores se hacen **por red (OTA)** con el entorno `wt32-eth01-ota`, sin cables.
 
 ---
 
-## 6. Configuración por barco (Portal Cautivo)
+## 6. Configuración del dispositivo (Modo Instalación) — PRODUCCIÓN
 
-Este es el paso que se repite **en cada barco** donde se instale un dispositivo.
+Cuando un WT32-ETH01 está **sin configurar** (recién flasheado o tras un reset de fábrica), entra automáticamente en **Modo Instalación**: sirve su página web de configuración en una dirección fácil sin necesidad de conocer IPs.
 
-### 6.1 Generar el token del dispositivo (desde la app web)
+### 6.0 Antes de empezar — Prueba el flujo tú mismo (demo para el técnico)
 
-Antes de ir al barco, desde la aplicación web:
+> El administrador debe hacer el procedimiento completo **una vez desde su propio equipo** antes de mostrarlo al técnico. Luego el técnico repite los mismos pasos con su laptop.
 
-1. Ir al módulo de embarcaciones
-2. Seleccionar el barco
-3. Sección "Dispositivo IoT" → **Generar Token**
-4. Copiar el token (ej: `a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab`)
-5. **Tener a mano el dominio del servidor** (ej: `https://api.tudominio.com`)
+### 6.1 Generar el token del dispositivo (desde la app de producción)
 
-### 6.2 Configurar el ESP32 con el celular
+1. Entrar a **https://nautic.run**
+2. Ir al módulo de embarcaciones
+3. Seleccionar el barco (o crear uno nuevo)
+4. Sección "Dispositivo IoT" → **Generar Token**
+5. Copiar el token (ej: `a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab`)
+6. La URL del API de producción es: **`https://api.nautic.run/api/v1/device/ping`**
 
-1. Encender el ESP32 (conectar a corriente USB)
-2. Desde el celular, ir a **Configuración WiFi**
-3. Buscar la red `TRACKING-XXXXXX` (las X son los últimos 6 dígitos de la MAC)
-4. Conectarse con contraseña: `tracking123`
-5. Se abre automáticamente el **portal cautivo** en el navegador
-6. Llenar los campos:
+### 6.2 Conectar el dispositivo (2 formas)
+
+**Forma A — Cable directo (recomendado, sin router):**
+```
+Laptop del técnico ──cable UTP──→ WT32-ETH01 (puerto RJ45)
+```
+El dispositivo se auto-asigna una IP y la laptop se configura sola.
+
+**Forma B — En la red del barco (con router):**
+```
+WT32-ETH01 (RJ45) ──→ Inyector PoE ──→ cable ──→ Splitter ──→ Router
+```
+El dispositivo obtiene IP por DHCP automáticamente.
+
+> **Energía:** durante la instalación el dispositivo se alimenta por el PoE (splitter → jack DC). Si usas cable directo (Forma A), desconecta el RJ45 del splitter y conecta el de la laptop — el splitter sigue entregando 5V.
+
+### 6.3 Abrir la página de configuración
+
+1. Desde cualquier dispositivo en la misma red (o conectado por cable directo), abrir el navegador
+2. Escribir: **`http://tracking.local`**
+   > Si no resuelve `tracking.local`, el dispositivo también imprime su IP por el Monitor Serial (durante el desarrollo) o aparece en la tabla DHCP del router.
+3. La página muestra:
+   - **Banner verde "Modo Instalación"**
+   - **Dirección de acceso** (`http://tracking.local`)
+   - MAC, firmware e IP del dispositivo
+
+### 6.4 Llenar el formulario y probar
 
 | Campo | Qué poner | Ejemplo |
 |-------|-----------|---------|
-| **WiFi SSID** | Red WiFi del barco | `Marina-Norte-5G` |
-| **WiFi Password** | Contraseña de esa red | `clave-del-barco` |
-| **Token del dispositivo** | El token generado en paso 6.1 | `a3f8b2c1-9d4e...` |
-| **URL del API** | **Dominio completo** del backend + ruta del endpoint | `https://api.tudominio.com/api/v1/device/ping` |
+| **Token del dispositivo** | El token generado en paso 6.1 | `a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab` |
+| **URL del API** | Dominio del backend + ruta del endpoint | `https://api.nautic.run/api/v1/device/ping` |
 | **Intervalo de envío (seg)** | Cada cuántos segundos enviar datos | `10` |
 | **Nombre embarcación** | Nombre identificador (opcional) | `Lancha Esperanza` |
 
-> **Sobre la URL del API:** El operador **siempre debe ingresar el dominio completo** del servidor. En desarrollo es algo como `http://192.168.1.100:8000/api/v1/device/ping`. En producción será `https://api.tudominio.com/api/v1/device/ping`. La ruta siempre termina en `/api/v1/device/ping`.
-7. Presionar **Save**
-8. El ESP32 se reinicia, se conecta al WiFi del barco y empieza a enviar datos
+**Antes de guardar, presionar el botón "🔍 Probar conexión (token + URL)":**
 
-### 6.3 Verificar que funciona
+| Respuesta del botón | Significado | Qué hacer |
+|---------------------|-------------|-----------|
+| ✅ "Conexión exitosa y token VÁLIDO" | Token y URL correctos | Presionar **Guardar** |
+| ❌ "TOKEN INVALIDO (HTTP 401/403)" | El servidor responde pero el token no corresponde | Regenerar token en la app y pegar el nuevo |
+| ❌ "Servidor respondió HTTP XXX" | La URL no apunta al endpoint correcto | Verificar la URL (debe terminar en `/api/v1/device/ping`) |
+| ❌ "No se pudo conectar" | No alcanza el servidor | Verificar red/internet del barco |
 
-**Opción A — Monitor Serial (si tienes PC conectado):**
+### 6.5 Guardar
+
+1. Presionar **"Guardar configuración"**
+2. El dispositivo se reinicia **solo** (página con spinner)
+3. Sale del Modo Instalación y entra en modo tracking contra producción
+
+### 6.6 Importar configuración por JSON (alternativa)
+
+Presionar "Importar Config JSON" → pegar el JSON → "Aplicar" → "Probar conexión" → "Guardar":
+
+```json
+{"token":"a3f8b2c1-9d4e-4f7a-b5c6-1234567890ab","api_url":"https://api.nautic.run/api/v1/device/ping","interval":10,"vessel_name":"Lancha Esperanza"}
 ```
-[WIFI] Conectado. IP: 192.168.1.45
-[GPS] OK (8 satelites)
-[API] POST https://api.tudominio.com/api/v1/device/ping
-[API] OK (200): cmd=
-```
 
-**Opción B — LED indicador:**
+### 6.7 Verificar que funciona
+
+**Opción A — LED indicador:**
 - LED encendido fijo = todo funcionando
 - Parpadeo lento = esperando GPS (normal los primeros 1-2 minutos al aire libre)
 
-**Opción C — Desde la app web:**
-- Ir al barco → Sección "Dispositivo" → ver estado "Online" con IP y último ping
+**Opción B — Desde la app web (nautic.run):**
+- Ir al barco → Sección "Dispositivo" → ver estado "Online" con IP, firmware y último ping
+
+**Opción C — Botón "Probar conexión" (repetir si se reconfigura):**
+- Si el dispositivo ya tiene configuración y se quiere validar de nuevo, hacer reset de fábrica (mantener IO0 a GND 4-5 segundos) y repetir desde 6.2.
+
+### 6.8 Demostración al técnico (desde otro equipo)
+
+Una vez validado el flujo, para mostrarlo al técnico desde otro equipo en la misma red:
+
+1. El técnico conecta su laptop al dispositivo (cable directo o misma red)
+2. Abre `http://tracking.local` en su navegador
+3. Completa el formulario con el token y la URL que el administrador le entregó
+4. Presiona **"Probar conexión"** → debe verse el mensaje verde
+5. Presiona **"Guardar configuración"** → el dispositivo se reinicia solo
+6. Listo — el dispositivo queda configurado sin haber tocado ninguna IP
 
 ---
 
@@ -246,16 +324,16 @@ Content-Type: application/json
 { "command": "reboot" }
 ```
 
-### 7.4 Reset WiFi remoto
+### 7.4 Abrir servidor de configuración remoto
 
 ```
 POST /api/v1/vessels/{id}/device/command
 Content-Type: application/json
 
-{ "command": "reset_wifi" }
+{ "command": "open_config_server" }
 ```
 
-El dispositivo borra las credenciales WiFi y reabre el portal cautivo. Útil si el barco cambia de red WiFi y alguien está físicamente presente para reconfigurar.
+El dispositivo inicia el servidor web de configuración. Útil si se necesita reconfigurar manualmente sin acceso físico.
 
 ### 7.5 Rotar token de seguridad
 
@@ -263,53 +341,49 @@ El dispositivo borra las credenciales WiFi y reabre el portal cautivo. Útil si 
 POST /api/v1/vessels/{id}/device/token/regen
 ```
 
-Genera un nuevo token. El dispositivo actual dejará de autenticarse hasta que se reconfigure con el nuevo token (vía portal cautivo o reset físico).
+Genera un nuevo token. El dispositivo actual dejará de autenticarse hasta que se reconfigure con el nuevo token (vía servidor web de configuración o reset físico).
 
 ---
 
-## 8. Despliegue en producción
+## 8. Despliegue en producción (Fase B — PoE)
 
-### 8.1 Backend con dominio
+### 8.1 Alimentación vía PoE
 
-Cuando el backend esté desplegado con un dominio (ej: `api.tudominio.com`), hay dos maneras de configurar los dispositivos:
+En producción, el dispositivo se alimenta por el mismo cable Ethernet que usa para datos:
+
+```
+Router/Switch ──UTP──→ Inyector PoE 48V ──UTP──→ Splitter PoE ──5V──→ WT32-ETH01
+                                         │
+                                    220V/110V
+```
+
+El splitter PoE entrega **5V/2A** a los pines 5V y GND del WT32-ETH01 (los mismos donde se conectaba el FT232RL durante el desarrollo).
+
+### 8.2 Dominio de producción
+
+El firmware apunta por defecto a **`https://api.nautic.run`**. Si algún día cambiara el dominio, hay dos maneras de actualizar los dispositivos:
 
 **Opción A — Antes de flashear (recomendado para flotas nuevas):**
 
 Cambiar en `config.h`:
 ```cpp
-#define DEFAULT_API_URL  "https://api.tudominio.com/api/v1/device/ping"
+#define DEFAULT_API_URL  "https://api.nautic.run/api/v1/device/ping"
 ```
-Así cada nuevo dispositivo tendrá la URL correcta por defecto.
 
 **Opción B — Sin re-flashear (dispositivos ya instalados):**
 
-Cada dispositivo ya en campo puede actualizarse de dos maneras:
-1. **Portal cautivo**: Reset físico (botón BOOT 3s) → reconfigurar con la nueva URL
-2. **Si aún puede comunicarse con el API anterior**: Enviar comando `update_config` para que recargue la config (la URL en sí se cambia desde el portal, no remotamente)
+Enviar comando remoto `update_config` con la nueva URL. El dispositivo la aplica en su siguiente ping.
 
-### 8.2 HTTPS
+### 8.3 HTTPS
 
-En producción, el backend debe usar HTTPS. El ESP32 soporta HTTPS nativamente. La URL en el portal cautivo simplemente cambia de `http://` a `https://`.
-
-> **Nota:** Si usas un certificado autofirmado (no recomendado), necesitarías agregar `http.setInsecure()` en `api_client.h`. Con certificados de Let's Encrypt u otra CA reconocida, funciona sin cambios.
-
-### 8.3 Alimentación en el barco
-
-| Fuente | Cómo conectar |
-|--------|---------------|
-| USB directo (12V-5V) | Conversor DC-DC 12V→5V con salida USB → ESP32 |
-| Powerbank | Conectar USB directo. Duración ~24-48h con 10.000mAh |
-| Panel solar + powerbank | Para instalaciones permanentes sin acceso a electricidad |
-| Cigarrera 12V del barco | Adaptador cigarrera → USB → ESP32 |
-
-El ESP32 consume ~80mA promedio (picos de ~250mA al transmitir WiFi).
+El backend de producción usa HTTPS. El ESP32 soporta HTTPS nativamente, por lo que la URL `https://api.nautic.run/...` funciona sin cambios.
 
 ### 8.4 Protección física
 
 Para instalación en barcos se recomienda:
 - Caja estanca IP65 o IP67 (protección contra agua y sal)
 - Antena GPS visible al cielo (no encerrada en metal)
-- Separar GPS de motores eléctricos (interferencia magnética)
+- El WT32-ETH01 dentro de la caja, con entrada para cable Ethernet
 - Fijar con bridas o cinta VHB para que no se mueva con el oleaje
 
 ---
@@ -317,18 +391,19 @@ Para instalación en barcos se recomienda:
 ## 9. Instalar en un nuevo barco (checklist rápido)
 
 ```
-□  Generar token desde la app web para el barco
-□  Conectar GPS al ESP32 (4 cables: 3V3, GND, GPIO16, GPIO17)
-□  Alimentar ESP32 por USB
-□  Desde celular → WiFi → conectar a "TRACKING-XXXXXX"
-□  En el portal cautivo, llenar:
-     • WiFi del barco (SSID + contraseña)
+□  En nautic.run: generar token para el barco
+□  Conectar GPS al WT32-ETH01 (4 cables: 5V, GND, RXD, TXD)
+□  Flashear firmware (una sola vez, requiere FT232RL + puente IO0→GND)
+□  Conectar UN cable de red: laptop → WT32-ETH01 (o al router)
+□  Navegador → http://tracking.local
+□  En el formulario, llenar:
      • Token del dispositivo
-     • URL del API (https://api.tudominio.com/api/v1/device/ping)
+     • URL del API (https://api.nautic.run/api/v1/device/ping)
      • Intervalo de envío (10 seg default)
-□  Guardar → ESP32 se conecta
-□  Verificar en la app web → barco aparece "Online"
-□  Montar en caja estanca con antena GPS al cielo
+□  Botón "Probar conexión" → mensaje VERDE
+□  Guardar → el dispositivo se reinicia solo y empieza a enviar
+□  Verificar en nautic.run → barco aparece "Online"
+□  Montar en el barco: splitter PoE (5V) a pines 5V/GND + RJ45 al router
 □  LISTO
 ```
 
@@ -338,22 +413,23 @@ Para instalación en barcos se recomienda:
 
 | Problema | LED | Causa probable | Solución |
 |----------|-----|----------------|----------|
-| No se conecta a WiFi | 2 flashes + pausa | SSID o contraseña incorrecta | Reset (BOOT 3s) → reconfigurar |
-| No envía datos al API | 3 flashes + pausa | URL incorrecta, backend caído, o token inválido | Verificar URL y token en portal |
+| No conecta Ethernet | 2 flashes + pausa | Cable UTP suelto, DHCP no asigna IP | Verificar cable, router, servidor DHCP |
+| No envía datos al API | 3 flashes + pausa | URL incorrecta o token inválido | Verificar URL y token en la página config (botón Probar conexión) |
 | Sin señal GPS | Parpadeo lento | GPS sin vista al cielo, o recién encendido | Mover antena a cielo abierto, esperar 1-2 min |
-| Token no configurado | 5 flashes + pausa | Faltó poner el token en el portal | Reset → reconfigurar con el token |
-| ESP32 no enciende | Nada | Cable USB malo, fuente sin corriente | Probar otro cable/fuente |
-| Portal cautivo no aparece | Parpadeo medio | El celular no redirige automáticamente | Abrir `192.168.4.1` manualmente en el navegador |
-| GPS demora mucho en fijar | Parpadeo lento >5 min | Primera vez en una ubicación nueva (cold start) | Normal; el GPS6MV2 tarda 1-5 min en cold start |
-| Errores consecutivos del API | 3 flashes | Backend no responde | Verificar que el backend está levantado y accesible |
+| Token no configurado | 5 flashes + pausa | Faltó poner el token | Acceder a http://tracking.local y configurar token |
+| WT32-ETH01 no enciende | Nada | Alimentación incorrecta | Verificar 5V en pines de alimentación |
+| No se puede flashear | Error upload | Puente IO0→GND no conectado o PoE alimentando | Revisar puente, quitar PoE, reconectar USB |
+| Servidor config no accesible | Parpadeo medio | mDNS no resuelve | Probar con la IP del dispositivo en la tabla DHCP del router |
+| GPS demora mucho en fijar | Parpadeo lento >5 min | Primera vez en ubicación nueva (cold start) | Normal; el GPS tarda 1-5 min en cold start |
 
-### Reiniciar todo desde cero
+### Reiniciar todo desde cero (sin botón BOOT)
 
-1. Mantener botón **BOOT** presionado 3 segundos
-2. El LED parpadea muy rápido → suelta el botón
-3. Se borra: WiFi + Token + URL + Intervalo
-4. Se abre el portal cautivo de nuevo
-5. Reconfigurar con el celular
+El WT32-ETH01 no tiene botón BOOT. Para borrar la configuración:
+
+1. Con el dispositivo encendido, **unir IO0 con GND** (cables juntos) **4-5 segundos**
+2. Soltar — el dispositivo borra la configuración NVS y se reinicia
+3. Al no tener token, entra en **Modo Instalación** (página en `tracking.local`)
+4. Reconfigurar desde el navegador
 
 ---
 

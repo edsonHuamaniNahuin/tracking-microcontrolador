@@ -4,35 +4,36 @@
  * ============================================================
  * Sistema de tracking GPS para embarcaciones marítimas.
  *
- * Hardware: ESP32 DevKit V1 + GPS6MV2 (HW-248)
- * Comunicación: WiFi → HTTP POST → tracking-api (Laravel)
+ * Hardware: WT32-ETH01 V1.4 (ESP32 + LAN8720 Ethernet) + GPS NEO-7M/6M
+ * Comunicación: Ethernet → HTTP POST → tracking-api (Laravel)
  *
  * Arquitectura modular:
- *   config.h          → Constantes y valores por defecto
- *   storage_manager.h → Persistencia en NVS (Preferences)
- *   wifi_portal.h     → WiFiManager + Portal Cautivo
- *   gps_reader.h      → Lectura GPS vía TinyGPS++
- *   api_client.h      → Cliente HTTP + ArduinoJson
- *   command_handler.h → Ejecución de comandos remotos
- *   led_indicator.h   → Indicador visual de estado
+ *   config.h           → Constantes y valores por defecto
+ *   storage_manager.h  → Persistencia en NVS (Preferences)
+ *   ethernet_manager.h → Ethernet LAN8720 + Servidor Web Config
+ *   gps_reader.h       → Lectura GPS vía TinyGPS++ (UART2: IO5/IO17)
+ *   api_client.h       → Cliente HTTP + ArduinoJson
+ *   command_handler.h  → Ejecución de comandos remotos
+ *   led_indicator.h    → Indicador visual de estado
  *
  * Flujo:
  *   1. Boot → Carga config de NVS
- *   2. Conecta WiFi (o abre portal cautivo para configurar)
- *   3. Loop: Lee GPS → Envía ping al API → Recibe comandos
- *   4. Comandos remotos: reboot, update_config, reset_wifi
- *   5. Botón BOOT (3s): Reset config → Reabre portal
+ *   2. Conecta Ethernet (DHCP)
+ *   3. Si no hay token → inicia servidor web de configuración
+ *   4. Loop: Lee GPS → Envía ping al API → Recibe comandos
+ *   5. Comandos remotos: reboot, update_config, open_config_server
+ *   6. Botón BOOT (3s): Reset config → Reinicia
  *
  * Librerías requeridas:
- *   - WiFiManager      (tzapu)
  *   - TinyGPSPlus      (Mikal Hart)
  *   - ArduinoJson      (Benoît Blanchon)
+ *   - ETH, WebServer, ESPmDNS (ESP32 Arduino Core)
  * ============================================================
  */
 
 #include "config.h"
 #include "storage_manager.h"
-#include "wifi_portal.h"
+#include "ethernet_manager.h"
 #include "gps_reader.h"
 #include "api_client.h"
 #include "command_handler.h"
@@ -40,7 +41,7 @@
 
 // ── Módulos ──────────────────────────────────────────────────
 StorageManager &storage = StorageManager::getInstance();
-WifiPortal wifi;
+EthernetManager eth;
 GpsReader gps;
 ApiClient api;
 LedIndicator led;
@@ -64,7 +65,7 @@ void setup()
   Serial.println();
   Serial.println("╔══════════════════════════════════════════╗");
   Serial.printf("║  Tracking GPS  v%s                 ║\n", FIRMWARE_VERSION);
-  Serial.println("║  ESP32 + GPS6MV2 → WiFi → API           ║");
+  Serial.println("║  WT32-ETH01 + GPS → Ethernet → API      ║");
   Serial.println("╚══════════════════════════════════════════╝");
 
   // Inicializar módulos
@@ -75,38 +76,50 @@ void setup()
   storage.begin();
   currentConfig = storage.load();
 
-  // Inicializar GPS
+  // Inicializar GPS (UART2: RX=IO5, TX=IO17)
   gps.begin();
 
   // Verificar que hay token configurado
   if (currentConfig.deviceToken.length() == 0)
   {
-    Serial.println("[MAIN] Sin token. El tecnico debe configurar via portal.");
+    Serial.println("[MAIN] Sin token. Iniciando servidor de configuracion web.");
     led.setState(DeviceState::ERROR_NO_TOKEN);
   }
 
-  // Conectar WiFi (o abrir portal cautivo)
-  led.setState(DeviceState::CONNECTING_WIFI);
+  // Conectar Ethernet
+  // Sin token → modo instalación (el técnico configura vía tracking.local)
+  led.setState(DeviceState::CONNECTING_NETWORK);
   led.update();
 
-  if (!wifi.begin())
+  bool setupMode = currentConfig.deviceToken.length() == 0;
+
+  if (!eth.begin(setupMode))
   {
-    Serial.println("[MAIN] WiFi fallo. Reiniciando en 5s...");
+    Serial.println("[MAIN] Ethernet fallo. Reiniciando en 5s...");
     delay(5000);
     ESP.restart();
   }
 
-  // Recargar config (pudo cambiar en el portal)
+  // Si no hay token, iniciar servidor web de configuración
+  if (currentConfig.deviceToken.length() == 0)
+  {
+    eth.startConfigServer();
+    led.setState(DeviceState::CONFIG_SERVER);
+    Serial.println("[MAIN] Servidor config activo. Accede via navegador:");
+    Serial.printf("[MAIN] >>> http://%s/ <<<\n", eth.getIP().c_str());
+  }
+  else
+  {
+    led.setState(DeviceState::WAITING_GPS);
+  }
+
+  // Recargar config (pudo cambiar via web)
   currentConfig = storage.load();
 
   if (currentConfig.deviceToken.length() == 0)
   {
     led.setState(DeviceState::ERROR_NO_TOKEN);
     Serial.println("[MAIN] ADVERTENCIA: Token no configurado");
-  }
-  else
-  {
-    led.setState(DeviceState::WAITING_GPS);
   }
 
   Serial.println("[MAIN] Sistema iniciado correctamente");
@@ -118,21 +131,32 @@ void setup()
   Serial.printf("[MAIN] API: %s\n", currentConfig.apiUrl.c_str());
   Serial.printf("[MAIN] Intervalo: %lu ms\n", currentConfig.sendInterval);
 
-  // ── Verificar conexión con el servidor ─────────────────
-  int verifyCode = wifi.verifyServerConnection();
-  if (verifyCode == 200 || verifyCode == 202)
+  // ── Verificar conexión con el servidor (solo si hay token) ──
+  if (currentConfig.deviceToken.length() > 0)
   {
-    Serial.println("[MAIN] >>> SERVIDOR OK - Iniciando tracking <<<");
-  }
-  else if (verifyCode == 401 || verifyCode == 403)
-  {
-    Serial.println("[MAIN] >>> TOKEN INVALIDO - Reconfigura via portal <<<");
-    led.setState(DeviceState::ERROR_NO_TOKEN);
+    int verifyCode = eth.verifyServerConnection();
+    if (verifyCode == 200 || verifyCode == 202)
+    {
+      Serial.println("[MAIN] >>> SERVIDOR OK - Iniciando tracking <<<");
+    }
+    else if (verifyCode == 401 || verifyCode == 403)
+    {
+      Serial.println("[MAIN] >>> TOKEN INVALIDO - Reconfigura via web <<<");
+      led.setState(DeviceState::ERROR_NO_TOKEN);
+      if (!eth.isConfigServerRunning())
+      {
+        eth.startConfigServer();
+      }
+    }
+    else
+    {
+      Serial.println("[MAIN] >>> SIN CONEXION AL SERVIDOR - Continuando igualmente <<<");
+      led.setState(DeviceState::ERROR_API);
+    }
   }
   else
   {
-    Serial.println("[MAIN] >>> SIN CONEXION AL SERVIDOR - Continuando igualmente <<<");
-    led.setState(DeviceState::ERROR_API);
+    Serial.println("[MAIN] >>> Esperando configuracion del tecnico en la pagina web <<<");
   }
 }
 
@@ -143,25 +167,31 @@ void loop()
 {
   unsigned long now = millis();
 
-  // ── 1. Actualizar LED ────────────────────────────────────
+  // ── 1. Servir cliente web de configuración ──────────────
+  eth.handleClient();
+
+  // ── 1b. Atender actualizaciones OTA por red ─────────────
+  eth.handleOta();
+
+  // ── 2. Actualizar LED ────────────────────────────────────
   led.update();
 
-  // ── 2. Leer GPS ──────────────────────────────────────────
+  // ── 3. Leer GPS ──────────────────────────────────────────
   gps.update();
 
-  // ── 3. Verificar botón reset (BOOT presionado 3s) ────────
+  // ── 4. Verificar botón reset (BOOT presionado 3s) ────────
   checkResetButton();
 
-  // ── 4. Reconexión WiFi automática ────────────────────────
-  if (!wifi.isConnected() && (now - lastReconnectTime >= WIFI_RECONNECT_INTERVAL))
+  // ── 5. Reconexión Ethernet automática ────────────────────
+  if (!eth.isConnected() && (now - lastReconnectTime >= ETH_RECONNECT_INTERVAL))
   {
     lastReconnectTime = now;
-    led.setState(DeviceState::ERROR_WIFI);
-    wifi.reconnect();
-    return; // skip este ciclo
+    led.setState(DeviceState::ERROR_NETWORK);
+    eth.reconnect();
+    return;
   }
 
-  // ── 5. Enviar telemetría al API ──────────────────────────
+  // ── 6. Enviar telemetría al API ──────────────────────────
   if (now - lastSendTime >= currentConfig.sendInterval)
   {
     lastSendTime = now;
@@ -177,7 +207,7 @@ void loop()
 
     // Enviar ping siempre (con o sin GPS válido)
     // El API acepta pings sin coordenadas como heartbeat
-    if (wifi.isConnected() && currentConfig.deviceToken.length() > 0)
+    if (eth.isConnected() && currentConfig.deviceToken.length() > 0)
     {
       ApiResponse resp = api.sendPing(gpsData);
 
@@ -204,6 +234,16 @@ void loop()
           Serial.printf("[MAIN] Config actualizada: intervalo=%lu ms\n",
                         currentConfig.sendInterval);
         }
+
+        // Abrir servidor config si se solicitó remotamente
+        if (commands.configServerRequested())
+        {
+          if (!eth.isConfigServerRunning())
+          {
+            eth.startConfigServer();
+            led.setState(DeviceState::CONFIG_SERVER);
+          }
+        }
       }
       else
       {
@@ -219,7 +259,7 @@ void loop()
     }
   }
 
-  // ── 6. Heartbeat serial (debug) ──────────────────────────
+  // ── 7. Heartbeat serial (debug) ──────────────────────────
   if (now - lastHeartbeat >= HEARTBEAT_INTERVAL)
   {
     lastHeartbeat = now;
@@ -250,7 +290,7 @@ void checkResetButton()
       if (millis() - pressStart > RESET_HOLD_TIME)
       {
         Serial.println("[MAIN] === RESET COMPLETO ===");
-        wifi.resetWifi();
+        eth.stopConfigServer();
         storage.clear();
         delay(500);
         ESP.restart();
@@ -265,9 +305,13 @@ void printStatus()
   GpsData gpsData = gps.read();
   Serial.println("────────────────────────────────────────");
   Serial.printf("  Uptime:     %lu s\n", millis() / 1000);
-  Serial.printf("  WiFi:       %s (%s)\n",
-                wifi.isConnected() ? "OK" : "DESCONECTADO",
-                wifi.isConnected() ? wifi.getIP().c_str() : "---");
+  Serial.printf("  Ethernet:   %s (%s)\n",
+                eth.isConnected() ? "OK" : "DESCONECTADO",
+                eth.isConnected() ? eth.getIP().c_str() : "---");
+  if (eth.isConfigServerRunning())
+  {
+    Serial.printf("  Web Config: ACTIVO (%s)\n", eth.getIP().c_str());
+  }
   Serial.printf("  GPS:        %s (%d sat, HDOP=%.1f)\n",
                 gpsData.isValid ? "OK" : "SIN SEÑAL",
                 gpsData.satellites, gpsData.hdop);

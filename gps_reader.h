@@ -25,6 +25,9 @@ struct GpsData
   double hdop; // precisión horizontal
   bool isValid;
   uint32_t age; // ms desde última lectura válida
+  unsigned long chars; // bytes NMEA recibidos (diagnóstico)
+  unsigned long passedChecksums; // sentencias NMEA válidas
+  unsigned long failedChecksums; // sentencias con checksum inválido
 };
 
 class GpsReader
@@ -60,6 +63,9 @@ public:
     data.isValid = _gps.location.isValid() &&
                    _gps.satellites.value() >= GPS_MIN_SATELLITES;
     data.age = _gps.location.age();
+    data.chars = _gps.charsProcessed();
+    data.passedChecksums = _gps.passedChecksum();
+    data.failedChecksums = _gps.failedChecksum();
     return data;
   }
 
