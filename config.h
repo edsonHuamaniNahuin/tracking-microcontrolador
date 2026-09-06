@@ -12,7 +12,7 @@
 #define CONFIG_H
 
 // ── Versión del firmware ──────────────────────────────────────
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.3.0"
 #define DEVICE_TYPE "WT32-ETH01-TRACKER"
 
 // ── Pines ─────────────────────────────────────────────────────

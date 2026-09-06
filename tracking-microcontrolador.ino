@@ -104,18 +104,22 @@ void setup()
     ESP.restart();
   }
 
-  // Si no hay token, iniciar servidor web de configuración
+  // Servidor web SIEMPRE activo (tracking.local):
+  //  - sin token  → formulario de configuración (Modo Instalación)
+  //  - con token  → página de estado + posibilidad de reconfigurar
+  eth.startConfigServer();
   if (currentConfig.deviceToken.length() == 0)
   {
-    eth.startConfigServer();
     led.setState(DeviceState::CONFIG_SERVER);
-    Serial.println("[MAIN] Servidor config activo. Accede via navegador:");
-    Serial.printf("[MAIN] >>> http://%s/ <<<\n", eth.getIP().c_str());
+    Serial.println("[MAIN] MODO INSTALACION. Accede via navegador:");
   }
   else
   {
     led.setState(DeviceState::WAITING_GPS);
+    Serial.println("[MAIN] Pagina de estado activa en tracking.local");
   }
+  Serial.printf("[MAIN] >>> http://tracking.local  (o http://%s/) <<<\n",
+                eth.getIP().c_str());
 
   // Recargar config (pudo cambiar via web)
   currentConfig = storage.load();

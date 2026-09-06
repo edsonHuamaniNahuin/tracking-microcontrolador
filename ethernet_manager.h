@@ -533,7 +533,11 @@ private:
 
     if (cfg.deviceToken.length() > 0)
     {
-      html.replace("{{MODE_BANNER}}", "");
+      html.replace("{{MODE_BANNER}}",
+                   "<div style=\"background:#0c4a6e;border:1px solid #38bdf8;color:#bae6fd;"
+                   "padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px\">"
+                   "&#9989; <b>Dispositivo en funcionamiento</b> — reportando a la API. "
+                   "Esta pagina muestra el estado; puedes actualizar la config si es necesario.</div>");
     }
     else
     {
