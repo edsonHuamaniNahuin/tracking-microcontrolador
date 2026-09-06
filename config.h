@@ -54,6 +54,11 @@
 #define LED_BLINK_FAST 150           // ms
 #define LED_BLINK_SLOW 1000          // ms
 
+// ── Watchdogs de auto-recuperación ──────────────────────────
+#define ETH_LINK_DOWN_RESTART_MS 60000    // link caído >60s → reiniciar (DHCP limpio)
+#define ETH_NO_IP_RESTART_MS 30000        // link activo sin IP >30s → reiniciar
+#define API_ERROR_RESTART_THRESHOLD 40    // >40 pings fallidos seguidos (≈7 min) → reiniciar
+
 // ── Límites ──────────────────────────────────────────────────
 #define MAX_HTTP_RETRIES 3
 #define HTTP_TIMEOUT 10000 // ms

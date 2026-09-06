@@ -54,6 +54,10 @@ unsigned long lastReconnectTime = 0;
 unsigned long lastHeartbeat = 0;
 int consecutiveApiErrors = 0;
 
+// Watchdogs de recuperación (para campo — sin acceso físico)
+unsigned long linkDownSince = 0;
+unsigned long ipMissingSince = 0;
+
 // =============================================================
 // SETUP
 // =============================================================
@@ -189,6 +193,53 @@ void loop()
     led.setState(DeviceState::ERROR_NETWORK);
     eth.reconnect();
     return;
+  }
+
+  // ── 5b. Watchdogs de auto-recuperación (campo) ───────────
+  // Link caído por mucho tiempo → reinicio limpio (re-negocia DHCP)
+  if (!eth.isConnected())
+  {
+    if (linkDownSince == 0)
+    {
+      linkDownSince = now;
+    }
+    else if (now - linkDownSince >= ETH_LINK_DOWN_RESTART_MS)
+    {
+      Serial.printf("[MAIN] Link caido %lu ms. Reiniciando para reconexion limpia...\n",
+                    now - linkDownSince);
+      ESP.restart();
+    }
+  }
+  else
+  {
+    linkDownSince = 0;
+
+    // Link activo pero sin IP (DHCP atascado) → reinicio
+    if (!eth.hasIp())
+    {
+      if (ipMissingSince == 0)
+      {
+        ipMissingSince = now;
+      }
+      else if (now - ipMissingSince >= ETH_NO_IP_RESTART_MS)
+      {
+        Serial.println("[MAIN] Sin IP con link activo. Reiniciando...");
+        ESP.restart();
+      }
+    }
+    else
+    {
+      ipMissingSince = 0;
+    }
+  }
+
+  // Muchos errores de API seguidos (DNS/red bloqueada) → reinicio
+  if (consecutiveApiErrors >= API_ERROR_RESTART_THRESHOLD)
+  {
+    Serial.printf("[MAIN] %d errores API consecutivos. Reiniciando...\n",
+                  consecutiveApiErrors);
+    consecutiveApiErrors = 0;
+    ESP.restart();
   }
 
   // ── 6. Enviar telemetría al API ──────────────────────────

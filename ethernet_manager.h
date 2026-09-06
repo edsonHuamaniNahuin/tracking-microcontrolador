@@ -273,6 +273,13 @@ public:
     return ETH.linkUp();
   }
 
+  /** ¿Tiene una IP válida asignada? (no 0.0.0.0 ni enlace local) */
+  bool hasIp()
+  {
+    IPAddress ip = ETH.localIP();
+    return ip[0] != 0 && !(ip[0] == 169 && ip[1] == 254);
+  }
+
   String getIP()
   {
     return ETH.localIP().toString();
