@@ -416,6 +416,7 @@ Para instalación en barcos se recomienda:
 | No conecta Ethernet | 2 flashes + pausa | Cable UTP suelto, DHCP no asigna IP | Verificar cable, router, servidor DHCP |
 | No envía datos al API | 3 flashes + pausa | URL incorrecta o token inválido | Verificar URL y token en la página config (botón Probar conexión) |
 | Sin señal GPS | Parpadeo lento | GPS sin vista al cielo, o recién encendido | Mover antena a cielo abierto, esperar 1-2 min |
+| GPS transmite pero 0 satélites | — | **Antena/receptor dañado** (calor excesivo al soldar) o sin cielo | Verificar en producción: `chars` sube pero `sats=0` → cambiar módulo. Soldar máximo 2-3 seg por punto |
 | Token no configurado | 5 flashes + pausa | Faltó poner el token | Acceder a http://tracking.local y configurar token |
 | WT32-ETH01 no enciende | Nada | Alimentación incorrecta | Verificar 5V en pines de alimentación |
 | No se puede flashear | Error upload | Puente IO0→GND no conectado o PoE alimentando | Revisar puente, quitar PoE, reconectar USB |
