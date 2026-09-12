@@ -12,7 +12,7 @@
 #define CONFIG_H
 
 // ── Versión del firmware ──────────────────────────────────────
-#define FIRMWARE_VERSION "1.3.0"
+#define FIRMWARE_VERSION "1.3.1"
 #define DEVICE_TYPE "WT32-ETH01-TRACKER"
 
 // ── Pines ─────────────────────────────────────────────────────
@@ -50,7 +50,9 @@
 // ── Intervalos del sistema ───────────────────────────────────
 #define ETH_RECONNECT_INTERVAL 10000 // ms
 #define HEARTBEAT_INTERVAL 60000     // ms (1 minuto)
-#define RESET_HOLD_TIME 3000         // ms (mantener botón 3s)
+// Reset de fabrica: mantener IO0 a GND 10 SEGUNDOS (antes 3s — un roce
+// accidental del cable IO0 con GND borraba la configuracion)
+#define RESET_HOLD_TIME 10000        // ms (mantener IO0 a GND 10s)
 #define LED_BLINK_FAST 150           // ms
 #define LED_BLINK_SLOW 1000          // ms
 
